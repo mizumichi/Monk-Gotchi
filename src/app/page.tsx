@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-orange-100">
@@ -21,7 +23,12 @@ export default function Home() {
             )
           )}
         </div>
-        <p className="text-sm text-orange-500 mt-4">Coming soon...</p>
+        <Link
+          href="/login"
+          className="mt-4 px-8 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-full shadow-md transition-colors"
+        >
+          ログイン / 新規登録
+        </Link>
       </main>
     </div>
   );
