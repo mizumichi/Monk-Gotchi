@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORIES, TASKS, type CategoryId, type Task } from "@/data/tasks";
+import {
+  TASKS,
+  CATEGORY_META,
+  TYPE_META,
+  type Category,
+  type Task,
+} from "@/data/tasks";
 
 interface Props {
   checkedTaskIds: Set<string>;
@@ -16,7 +22,7 @@ export default function TaskList({
   onToggle,
   loading = false,
 }: Props) {
-  const [activeCategory, setActiveCategory] = useState<CategoryId>("exercise");
+  const [activeCategory, setActiveCategory] = useState<Category>("strength");
 
   const filteredTasks = TASKS.filter((t) => t.category === activeCategory);
 
@@ -24,20 +30,22 @@ export default function TaskList({
     <div>
       {/* Category tabs */}
       <div className="flex overflow-x-auto border border-zinc-800 bg-zinc-900 scrollbar-none">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveCategory(cat.id)}
-            className={`flex-none px-3 py-2.5 font-mono text-xs flex items-center gap-1.5 transition-colors border-r border-zinc-800 last:border-r-0 whitespace-nowrap ${
-              activeCategory === cat.id
-                ? "bg-violet-600 text-white"
-                : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
-            }`}
-          >
-            <span className="leading-none">{cat.icon}</span>
-            <span>{cat.name}</span>
-          </button>
-        ))}
+        {(Object.entries(CATEGORY_META) as [Category, (typeof CATEGORY_META)[Category]][]).map(
+          ([catId, meta]) => (
+            <button
+              key={catId}
+              onClick={() => setActiveCategory(catId)}
+              className={`flex-none px-3 py-2.5 font-mono text-xs flex items-center gap-1.5 transition-colors border-r border-zinc-800 last:border-r-0 whitespace-nowrap ${
+                activeCategory === catId
+                  ? "bg-violet-600 text-white"
+                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              }`}
+            >
+              <span className="leading-none">{meta.icon}</span>
+              <span>{meta.label}</span>
+            </button>
+          )
+        )}
       </div>
 
       {/* Task cards */}
@@ -52,72 +60,130 @@ export default function TaskList({
           filteredTasks.map((task) => {
             const checked = checkedTaskIds.has(task.id);
             const pending = pendingTaskIds.has(task.id);
+            const typeMeta = TYPE_META[task.type];
+            const catMeta = CATEGORY_META[task.category];
+            const subCatMeta = task.subCategory
+              ? CATEGORY_META[task.subCategory]
+              : undefined;
+
             return (
               <div
                 key={task.id}
-                className="flex items-center gap-3 bg-zinc-900 px-4 py-3.5 hover:bg-zinc-800/60 transition-colors"
+                className="flex items-center gap-3 bg-zinc-900 pr-4 py-3.5 hover:bg-zinc-800/60 transition-colors"
+                style={{
+                  borderLeft: `4px solid ${typeMeta.color}`,
+                  paddingLeft: "12px",
+                }}
               >
-                <span
-                  className="text-2xl leading-none flex-none"
-                  role="img"
-                  aria-hidden
-                >
-                  {task.icon}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className={`font-mono text-sm truncate ${
-                      checked ? "text-zinc-400 line-through" : "text-zinc-100"
-                    }`}
+                {/* Icon + special badge */}
+                <div className="flex-none relative">
+                  <span
+                    className="text-2xl leading-none"
+                    role="img"
+                    aria-hidden
                   >
-                    {task.name}
-                  </p>
+                    {task.icon}
+                  </span>
+                  {task.type === "special" && (
+                    <span className="absolute -top-1 -right-1 font-mono text-[8px] bg-amber-600 text-white px-0.5 leading-tight rounded-sm">
+                      特別
+                    </span>
+                  )}
+                </div>
+
+                {/* Text */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p
+                      className={`font-mono text-sm ${
+                        checked
+                          ? "text-zinc-400 line-through"
+                          : "text-zinc-100"
+                      }`}
+                    >
+                      {task.name}
+                    </p>
+                    {task.frequency !== "daily" && (
+                      <span className="font-mono text-[9px] border border-zinc-700 text-zinc-500 px-1 leading-tight whitespace-nowrap">
+                        {task.frequency === "weekly" ? "週次" : "任意"}
+                      </span>
+                    )}
+                  </div>
                   <p className="font-mono text-xs text-zinc-500 truncate mt-0.5">
                     {task.description}
                   </p>
-                  <span
-                    className={`inline-block mt-1.5 font-mono text-xs ${
-                      checked ? "text-emerald-500" : "text-violet-400"
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    <span
+                      className={`font-mono text-xs ${
+                        checked ? "text-emerald-500" : "text-violet-400"
+                      }`}
+                    >
+                      +{task.mainXp} {catMeta.icon}
+                      {catMeta.label}
+                    </span>
+                    {subCatMeta && task.subXp && (
+                      <>
+                        <span className="font-mono text-xs text-zinc-600">
+                          ·
+                        </span>
+                        <span
+                          className={`font-mono text-xs ${
+                            checked ? "text-emerald-500/70" : "text-zinc-500"
+                          }`}
+                        >
+                          +{task.subXp} {subCatMeta.icon}
+                          {subCatMeta.label}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Button */}
+                <div className="flex-none flex flex-col items-center gap-0.5">
+                  <button
+                    onClick={() => onToggle(task)}
+                    disabled={pending}
+                    aria-label={
+                      checked
+                        ? `${task.name}を未完了にする`
+                        : task.type === "avoidance"
+                        ? `${task.name}: 回避できた`
+                        : `${task.name}を完了にする`
+                    }
+                    className={`w-6 h-6 rounded-full border-2 transition-colors flex items-center justify-center ${
+                      pending
+                        ? "border-zinc-700 opacity-50 cursor-not-allowed"
+                        : checked
+                        ? "border-emerald-500 bg-emerald-500 hover:bg-emerald-400 hover:border-emerald-400"
+                        : task.type === "avoidance"
+                        ? "border-blue-500 hover:border-blue-400 hover:bg-blue-900/30"
+                        : "border-zinc-600 hover:border-violet-400"
                     }`}
                   >
-                    +{task.points}pt
+                    {checked && !pending && (
+                      <svg
+                        className="w-3.5 h-3.5 text-white"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 6l3 3 5-5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                    {pending && (
+                      <div className="w-2.5 h-2.5 border border-zinc-500 border-t-transparent rounded-full animate-spin" />
+                    )}
+                  </button>
+                  <span className="font-mono text-[9px] text-zinc-600 whitespace-nowrap">
+                    {task.type === "avoidance" ? "回避できた" : "できた"}
                   </span>
                 </div>
-                <button
-                  onClick={() => onToggle(task)}
-                  disabled={pending}
-                  aria-label={
-                    checked
-                      ? `${task.name}を未完了にする`
-                      : `${task.name}を完了にする`
-                  }
-                  className={`flex-none w-6 h-6 rounded-full border-2 transition-colors flex items-center justify-center ${
-                    pending
-                      ? "border-zinc-700 opacity-50 cursor-not-allowed"
-                      : checked
-                      ? "border-emerald-500 bg-emerald-500 hover:bg-emerald-400 hover:border-emerald-400"
-                      : "border-zinc-600 hover:border-violet-400"
-                  }`}
-                >
-                  {checked && !pending && (
-                    <svg
-                      className="w-3.5 h-3.5 text-white"
-                      viewBox="0 0 12 12"
-                      fill="none"
-                    >
-                      <path
-                        d="M2 6l3 3 5-5"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                  {pending && (
-                    <div className="w-2.5 h-2.5 border border-zinc-500 border-t-transparent rounded-full animate-spin" />
-                  )}
-                </button>
               </div>
             );
           })

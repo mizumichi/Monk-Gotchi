@@ -1,4 +1,4 @@
-import { TASKS, type CategoryId } from "@/data/tasks";
+import { calcCategoryScores, calcTotalXp, type Category } from "@/data/tasks";
 import { calculateDayNumber, getStage } from "@/lib/date";
 import type { Schema } from "../../amplify/data/resource";
 
@@ -16,7 +16,7 @@ export type FinalType =
   | "average"
   | "slothking";
 
-// 進化判定の閾値 (ここを変えるだけでバランス調整できる)
+// 進化判定の閾値 (C-3 で再計算予定)
 const THRESHOLD = {
   MID_EXCELLENT: 600,
   MID_NORMAL: 200,
@@ -32,25 +32,10 @@ export function determineMidType(totalScore: number): MidType {
   return "lazy";
 }
 
-function computeCategoryScores(logs: DailyLog[]): Record<CategoryId, number> {
-  const scores: Record<CategoryId, number> = {
-    exercise: 0,
-    sleep: 0,
-    nutrition: 0,
-    sunlight: 0,
-    mental: 0,
-  };
-  for (const log of logs) {
-    const task = TASKS.find((t) => t.id === log.taskId);
-    if (task) scores[task.category] += log.points;
-  }
-  return scores;
-}
-
 export function determineFinalType(
   midType: MidType,
   totalScore: number,
-  categoryScores: Record<CategoryId, number>
+  categoryScores: Record<Category, number>
 ): FinalType {
   if (midType === "excellent") {
     const allAbove200 = Object.values(categoryScores).every(
@@ -60,15 +45,15 @@ export function determineFinalType(
       return "sage";
     }
 
-    const entries = Object.entries(categoryScores) as [CategoryId, number][];
+    const entries = Object.entries(categoryScores) as [Category, number][];
     const maxScore = Math.max(...entries.map(([, s]) => s));
     const dominant = entries.find(([, s]) => s === maxScore)?.[0];
 
     if (dominant && maxScore >= totalScore * THRESHOLD.FINAL_DOMINANT_RATIO) {
-      if (dominant === "exercise") return "overlord";
+      if (dominant === "strength") return "overlord";
       if (dominant === "nutrition") return "hermit";
       if (dominant === "mental") return "wise";
-      if (dominant === "sleep" || dominant === "sunlight") return "guardian";
+      if (dominant === "sleep" || dominant === "environment") return "guardian";
     }
     return "guardian";
   }
@@ -96,14 +81,15 @@ export function checkEvolution(
 
   if (newStage === character.stage) return null;
 
-  const totalScore = allLogs.reduce((sum, log) => sum + log.points, 0);
+  const taskIds = allLogs.map((l) => l.taskId);
+  const totalScore = calcTotalXp(taskIds);
 
   if (newStage === "mid") {
     return { stage: newStage, midType: determineMidType(totalScore) };
   }
 
   if (newStage === "final") {
-    const categoryScores = computeCategoryScores(allLogs);
+    const categoryScores = calcCategoryScores(taskIds);
     const midType =
       (character.midType as MidType | null | undefined) ??
       determineMidType(totalScore);

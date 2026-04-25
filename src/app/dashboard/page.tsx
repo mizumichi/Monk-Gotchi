@@ -12,27 +12,14 @@ import { useCharacter } from "@/hooks/useCharacter";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
 import { CHARACTERS } from "@/data/characters";
-import { TASKS, type CategoryId, type Task } from "@/data/tasks";
+import { calcCategoryScores, type Category, type Task } from "@/data/tasks";
 import type { Schema } from "../../../amplify/data/resource";
 
 type DailyLog = Schema["DailyLog"]["type"];
-type Scores = Record<CategoryId, number>;
-
-const EMPTY_SCORES: Scores = {
-  exercise: 0,
-  sleep: 0,
-  nutrition: 0,
-  sunlight: 0,
-  mental: 0,
-};
+type Scores = Record<Category, number>;
 
 function computeScores(logs: DailyLog[]): Scores {
-  const scores = { ...EMPTY_SCORES };
-  for (const log of logs) {
-    const task = TASKS.find((t) => t.id === log.taskId);
-    if (task) scores[task.category] += log.points;
-  }
-  return scores;
+  return calcCategoryScores(logs.map((l) => l.taskId));
 }
 
 export default function DashboardPage() {
@@ -156,7 +143,7 @@ export default function DashboardPage() {
           userId,
           date: today,
           taskId: task.id,
-          points: task.points,
+          points: task.mainXp,
           completedAt: new Date().toISOString(),
         });
         if (data) setDailyLogs((prev) => [...prev, data]);
