@@ -16,6 +16,7 @@ const schema = a.schema({
       taskId: a.string().required(),
       points: a.integer().required(),
       completedAt: a.datetime().required(),
+      numericValues: a.json(),
     })
     .authorization((allow) => [allow.owner()]),
 

@@ -12,6 +12,8 @@ import {
   type Stage,
 } from "@/lib/date";
 import { checkEvolution } from "@/lib/evolution";
+import { calcSleepHoursXp } from "@/lib/sleepXp";
+import { getTaskById } from "@/data/tasks";
 import type { Schema } from "../../amplify/data/resource";
 
 type Character = Schema["Character"]["type"];
@@ -38,17 +40,21 @@ export interface UseCharacterResult {
   dateOverride: string | null;
   isLoading: boolean;
   error: Error | null;
+  numericValues: Record<string, number>;
   refetch: () => Promise<void>;
   advanceDay: () => Promise<AdvanceDayResult>;
   checkAndEvolve: () => Promise<AdvanceDayResult>;
   resetDate: () => Promise<void>;
   rebornAsEgg: () => Promise<RebornResult>;
+  submitNumericValue: (taskId: string, value: number) => Promise<void>;
+  clearNumericValue: (taskId: string) => Promise<void>;
 }
 
 export function useCharacter(enabled: boolean = true): UseCharacterResult {
   const [character, setCharacter] = useState<Character | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [numericValues, setNumericValues] = useState<Record<string, number>>({});
   const [dateOverride, setDateOverrideState] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("dateOverride");
@@ -91,6 +97,36 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
     if (!enabled) return;
     fetchOrCreate();
   }, [enabled, fetchOrCreate]);
+
+  // Load today's numeric values from DailyLog
+  useEffect(() => {
+    if (!enabled) return;
+    async function loadNumericValues() {
+      try {
+        const today = getCurrentDateString();
+        const { data } = await client.models.DailyLog.list({
+          filter: { date: { eq: today } },
+        });
+        const parsed: Record<string, number> = {};
+        for (const log of data ?? []) {
+          if (log.numericValues) {
+            try {
+              const nv = typeof log.numericValues === 'string'
+                ? JSON.parse(log.numericValues)
+                : log.numericValues;
+              if (nv && typeof nv[log.taskId] === 'number') {
+                parsed[log.taskId] = nv[log.taskId];
+              }
+            } catch { /* skip malformed */ }
+          }
+        }
+        setNumericValues(parsed);
+      } catch (err) {
+        console.error("[useCharacter] loadNumericValues error:", err);
+      }
+    }
+    loadNumericValues();
+  }, [enabled]);
 
   const today = getCurrentDateString();
   const cycleStartDate = character?.cycleStartDate ?? today;
@@ -232,6 +268,64 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
     }
   }, [character]);
 
+  const submitNumericValue = useCallback(async (taskId: string, value: number) => {
+    try {
+      const { userId } = await getCurrentUser();
+      const today = getCurrentDateString();
+      const task = getTaskById(taskId);
+      if (!task) return;
+      const ratio = calcSleepHoursXp(value);
+      const mainPts = Math.round(task.mainXp * ratio);
+      const subPts = task.subXp != null ? Math.round(task.subXp * ratio) : 0;
+
+      const { data: existing } = await client.models.DailyLog.list({
+        filter: { date: { eq: today }, taskId: { eq: taskId } },
+      });
+
+      const numericValuesPayload = JSON.stringify({ [taskId]: value });
+
+      if (existing && existing.length > 0) {
+        await client.models.DailyLog.update({
+          id: existing[0].id,
+          points: mainPts + subPts,
+          numericValues: numericValuesPayload,
+        });
+      } else {
+        await client.models.DailyLog.create({
+          userId,
+          date: today,
+          taskId,
+          points: mainPts + subPts,
+          completedAt: new Date().toISOString(),
+          numericValues: numericValuesPayload,
+        });
+      }
+
+      setNumericValues((prev) => ({ ...prev, [taskId]: value }));
+    } catch (err) {
+      console.error("[useCharacter] submitNumericValue error:", err);
+    }
+  }, []);
+
+  const clearNumericValue = useCallback(async (taskId: string) => {
+    try {
+      const today = getCurrentDateString();
+      const { data: existing } = await client.models.DailyLog.list({
+        filter: { date: { eq: today }, taskId: { eq: taskId } },
+      });
+      if (existing && existing.length > 0) {
+        await client.models.DailyLog.delete({ id: existing[0].id });
+      }
+      setNumericValues((prev) => {
+        const next = { ...prev };
+        delete next[taskId];
+        return next;
+      });
+    } catch (err) {
+      console.error("[useCharacter] clearNumericValue error:", err);
+    }
+  }, []);
+
   return {
     character,
     dayNumber,
@@ -242,10 +336,13 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
     dateOverride,
     isLoading,
     error,
+    numericValues,
     refetch: fetchOrCreate,
     advanceDay,
     checkAndEvolve,
     resetDate,
     rebornAsEgg,
+    submitNumericValue,
+    clearNumericValue,
   };
 }

@@ -4,6 +4,13 @@ export type TaskType = 'recommended' | 'avoidance';
 
 export type TaskFrequency = 'daily' | 'weekly' | 'optional';
 
+export type TaskKind = 'check' | 'numeric';
+
+export interface TaskConstraints {
+  noNextDay?: boolean;
+  cycleLimit?: number;
+}
+
 export interface Task {
   id: string;
   name: string;
@@ -15,6 +22,8 @@ export interface Task {
   mainXp: number;
   subXp?: number;
   frequency: TaskFrequency;
+  taskKind?: TaskKind;
+  constraints?: TaskConstraints;
 }
 
 export const CATEGORY_META: Record<Category, { label: string; icon: string; color: string }> = {
@@ -43,6 +52,7 @@ export const TASKS: Task[] = [
     mainXp: 40,
     subXp: 10,
     frequency: 'weekly',
+    constraints: { noNextDay: true, cycleLimit: 3 },
   },
   {
     id: 'bench_compound',
@@ -55,6 +65,7 @@ export const TASKS: Task[] = [
     mainXp: 32,
     subXp: 8,
     frequency: 'weekly',
+    constraints: { noNextDay: true, cycleLimit: 3 },
   },
   {
     id: 'hiit',
@@ -67,6 +78,7 @@ export const TASKS: Task[] = [
     mainXp: 32,
     subXp: 8,
     frequency: 'weekly',
+    constraints: { noNextDay: true, cycleLimit: 3 },
   },
   {
     id: 'sprint',
@@ -79,6 +91,7 @@ export const TASKS: Task[] = [
     mainXp: 28,
     subXp: 7,
     frequency: 'weekly',
+    constraints: { noNextDay: true, cycleLimit: 2 },
   },
   {
     id: 'volume_10x10',
@@ -91,6 +104,7 @@ export const TASKS: Task[] = [
     mainXp: 36,
     subXp: 9,
     frequency: 'weekly',
+    constraints: { noNextDay: true, cycleLimit: 2 },
   },
   {
     id: 'cardio_obese',
@@ -141,7 +155,20 @@ export const TASKS: Task[] = [
     frequency: 'daily',
   },
 
-  // B. 睡眠・休息(sleep) 5タスク
+  // B. 睡眠・休息(sleep) 6タスク
+  {
+    id: 'sleep_hours',
+    name: '睡眠時間',
+    description: '7-9時間が満点。短すぎても長すぎても減点',
+    icon: '😴',
+    type: 'recommended',
+    category: 'sleep',
+    subCategory: 'mental',
+    mainXp: 40,
+    subXp: 10,
+    frequency: 'daily',
+    taskKind: 'numeric',
+  },
   {
     id: 'sleep_env',
     name: '深睡眠環境を整えた',
@@ -243,7 +270,9 @@ export const TASKS: Task[] = [
     category: 'nutrition',
     mainXp: 15,
     frequency: 'weekly',
+    constraints: { cycleLimit: 3 },
   },
+  // omega3_fish: 仕様書ではマグロ系のみ2回上限。食材判別不可のため本実装では制約なし。
   {
     id: 'omega3_fish',
     name: '脂性魚/オメガ3 1-2g',
@@ -391,6 +420,7 @@ export const TASKS: Task[] = [
     mainXp: 6,
     subXp: 2,
     frequency: 'weekly',
+    constraints: { noNextDay: true, cycleLimit: 3 },
   },
   {
     id: 'cold_shower',
@@ -598,7 +628,10 @@ export function getTotalXp(task: Task): number {
   return task.mainXp + (task.subXp ?? 0);
 }
 
-export function calcCategoryScores(completedTaskIds: string[]): Record<Category, number> {
+export function calcCategoryScores(
+  completedTaskIds: string[],
+  numericValues?: Record<string, number>
+): Record<Category, number> {
   const scores: Record<Category, number> = {
     strength: 0,
     sleep: 0,
@@ -609,9 +642,17 @@ export function calcCategoryScores(completedTaskIds: string[]): Record<Category,
   for (const id of completedTaskIds) {
     const task = getTaskById(id);
     if (!task) continue;
-    scores[task.category] += task.mainXp;
-    if (task.subCategory && task.subXp) {
-      scores[task.subCategory] += task.subXp;
+    if (task.taskKind === 'numeric' && numericValues) {
+      // numeric tasks compute XP externally; points are passed via numericValues
+      const mainPts = numericValues[`${id}_main`] ?? 0;
+      const subPts = numericValues[`${id}_sub`] ?? 0;
+      scores[task.category] += mainPts;
+      if (task.subCategory) scores[task.subCategory] += subPts;
+    } else {
+      scores[task.category] += task.mainXp;
+      if (task.subCategory && task.subXp) {
+        scores[task.subCategory] += task.subXp;
+      }
     }
   }
   return scores;

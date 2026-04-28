@@ -9,17 +9,35 @@ import CharacterDisplay from "@/components/CharacterDisplay";
 import ScoreBars from "@/components/ScoreBars";
 import TaskList from "@/components/TaskList";
 import { useCharacter } from "@/hooks/useCharacter";
+import { useRecentLogs } from "@/hooks/useRecentLogs";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
 import { CHARACTERS } from "@/data/characters";
 import { calcCategoryScores, type Category, type Task } from "@/data/tasks";
+import { calcSleepHoursXp } from "@/lib/sleepXp";
 import type { Schema } from "../../../amplify/data/resource";
 
 type DailyLog = Schema["DailyLog"]["type"];
 type Scores = Record<Category, number>;
 
 function computeScores(logs: DailyLog[]): Scores {
-  return calcCategoryScores(logs.map((l) => l.taskId));
+  const numericValues: Record<string, number> = {};
+  for (const log of logs) {
+    if (log.numericValues) {
+      try {
+        const nv = typeof log.numericValues === 'string'
+          ? JSON.parse(log.numericValues)
+          : log.numericValues;
+        if (nv && typeof nv[log.taskId] === 'number') {
+          const ratio = calcSleepHoursXp(nv[log.taskId]);
+          // mainXp=40, subXp=10 for sleep_hours; use the stored ratio to derive per-category pts
+          numericValues[`${log.taskId}_main`] = Math.round(40 * ratio);
+          numericValues[`${log.taskId}_sub`] = Math.round(10 * ratio);
+        }
+      } catch { /* skip */ }
+    }
+  }
+  return calcCategoryScores(logs.map((l) => l.taskId), numericValues);
 }
 
 export default function DashboardPage() {
@@ -36,11 +54,16 @@ export default function DashboardPage() {
     finalType,
     dateOverride,
     isLoading: characterLoading,
+    numericValues,
     advanceDay,
     checkAndEvolve,
     resetDate,
     rebornAsEgg,
+    submitNumericValue,
+    clearNumericValue,
   } = useCharacter(isAuthenticated);
+
+  const { logs: recentLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated);
 
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -129,6 +152,22 @@ export default function DashboardPage() {
     toastTimer.current = setTimeout(() => setEvolutionMessage(null), 3000);
   }
 
+  async function handleNumericSubmit(taskId: string, value: number) {
+    await submitNumericValue(taskId, value);
+    setLogsTrigger((n) => n + 1);
+    refetchRecentLogs();
+    const result = await checkAndEvolve();
+    if (result.evolved) {
+      showEvolutionToast(result.newStage, result.midType, result.finalType);
+    }
+  }
+
+  async function handleNumericClear(taskId: string) {
+    await clearNumericValue(taskId);
+    setLogsTrigger((n) => n + 1);
+    refetchRecentLogs();
+  }
+
   async function handleToggle(task: Task) {
     setPendingTaskIds((prev) => new Set(prev).add(task.id));
     try {
@@ -156,6 +195,7 @@ export default function DashboardPage() {
         next.delete(task.id);
         return next;
       });
+      refetchRecentLogs();
       // タスク変更後に進化チェック (ステージ境界を跨いでいた場合に備えて)
       const result = await checkAndEvolve();
       if (result.evolved) {
@@ -266,6 +306,10 @@ export default function DashboardPage() {
           pendingTaskIds={pendingTaskIds}
           onToggle={handleToggle}
           loading={logsLoading}
+          numericValues={numericValues}
+          onNumericSubmit={handleNumericSubmit}
+          onNumericClear={handleNumericClear}
+          recentLogs={recentLogs}
         />
       </main>
     </div>
