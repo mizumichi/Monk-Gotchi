@@ -25,6 +25,7 @@ interface Props {
   onNumericSubmit?: (taskId: string, value: number) => void;
   onNumericClear?: (taskId: string) => void;
   recentLogs?: DailyLogSummary[];
+  today?: string;
 }
 
 export default function TaskList({
@@ -36,12 +37,13 @@ export default function TaskList({
   onNumericSubmit,
   onNumericClear,
   recentLogs = [],
+  today: todayProp,
 }: Props) {
   const [activeCategory, setActiveCategory] = useState<Category>("strength");
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [expandedReasonId, setExpandedReasonId] = useState<string | null>(null);
 
-  const today = getTodayString();
+  const today = todayProp ?? getTodayString();
 
   const constraintMap = useMemo(() => {
     const map: Record<string, ReturnType<typeof checkConstraint>> = {};

@@ -63,7 +63,10 @@ export default function DashboardPage() {
     clearNumericValue,
   } = useCharacter(isAuthenticated);
 
-  const { logs: recentLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated);
+  // dateOverride が変わるたびに再レンダーされるので、毎回実効日付を計算する
+  const effectiveToday = getCurrentDateString();
+
+  const { logs: recentLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated, 7, effectiveToday);
 
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -122,6 +125,7 @@ export default function DashboardPage() {
   }
 
   async function handleResetDate() {
+    setDailyLogs([]);
     await resetDate();
     setLogsTrigger((n) => n + 1);
     setEvolutionMessage(null);
@@ -136,6 +140,7 @@ export default function DashboardPage() {
     );
     if (!ok) return;
 
+    setDailyLogs([]);
     const result = await rebornAsEgg();
     setLogsTrigger((n) => n + 1);
     if (result.success && result.recordedType) {
@@ -310,6 +315,7 @@ export default function DashboardPage() {
           onNumericSubmit={handleNumericSubmit}
           onNumericClear={handleNumericClear}
           recentLogs={recentLogs}
+          today={effectiveToday}
         />
       </main>
     </div>
