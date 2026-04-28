@@ -1,6 +1,6 @@
 export type Category = 'strength' | 'sleep' | 'nutrition' | 'environment' | 'mental';
 
-export type TaskType = 'recommended' | 'special' | 'avoidance';
+export type TaskType = 'recommended' | 'avoidance';
 
 export type TaskFrequency = 'daily' | 'weekly' | 'optional';
 
@@ -15,7 +15,6 @@ export interface Task {
   mainXp: number;
   subXp?: number;
   frequency: TaskFrequency;
-  evidence?: string;
 }
 
 export const CATEGORY_META: Record<Category, { label: string; icon: string; color: string }> = {
@@ -26,14 +25,13 @@ export const CATEGORY_META: Record<Category, { label: string; icon: string; colo
   mental:      { label: '精神',   icon: '🧘', color: '#06b6d4' },
 };
 
-export const TYPE_META: Record<TaskType, { label: string; color: string; bgColor: string }> = {
-  recommended: { label: '推奨', color: '#ef4444', bgColor: '#7f1d1d33' },
-  special:     { label: '特別', color: '#f59e0b', bgColor: '#78350f33' },
-  avoidance:   { label: '回避', color: '#3b82f6', bgColor: '#1e3a8a33' },
+export const TYPE_META: Record<TaskType, { label: string; color: string; bgColor: string; borderColor: string }> = {
+  recommended: { label: '推奨', color: '#ef4444', bgColor: '#7f1d1d33', borderColor: '#ef4444' },
+  avoidance:   { label: '回避', color: '#3b82f6', bgColor: '#1e3a8a33', borderColor: '#3b82f6' },
 };
 
 export const TASKS: Task[] = [
-  // A. 筋トレ・運動(strength) 11タスク
+  // A. 筋トレ・運動(strength) 9タスク
   {
     id: 'squat_heavy',
     name: 'スクワット/デッドリフト 3×8-10回',
@@ -45,7 +43,6 @@ export const TASKS: Task[] = [
     mainXp: 40,
     subXp: 10,
     frequency: 'weekly',
-    evidence: 'Kraemer 1990: 急性T+20-40%',
   },
   {
     id: 'bench_compound',
@@ -58,12 +55,11 @@ export const TASKS: Task[] = [
     mainXp: 32,
     subXp: 8,
     frequency: 'weekly',
-    evidence: 'Crewther 2006',
   },
   {
     id: 'hiit',
     name: 'HIIT 4×4分',
-    description: '高強度インターバルで急性T上昇',
+    description: 'ノルウェー式高強度インターバル',
     icon: '🔥',
     type: 'recommended',
     category: 'strength',
@@ -71,12 +67,11 @@ export const TASKS: Task[] = [
     mainXp: 32,
     subXp: 8,
     frequency: 'weekly',
-    evidence: "d'Hooghe 2021(深睡眠促進)",
   },
   {
     id: 'sprint',
     name: 'スプリント 6×30秒',
-    description: '短距離全力で成長ホルモン分泌',
+    description: '全力ダッシュで成長ホルモン分泌',
     icon: '🏃',
     type: 'recommended',
     category: 'strength',
@@ -84,12 +79,11 @@ export const TASKS: Task[] = [
     mainXp: 28,
     subXp: 7,
     frequency: 'weekly',
-    evidence: 'Hackney 2015',
   },
   {
     id: 'volume_10x10',
     name: '10×10 ハイパートロフィー',
-    description: '代謝ストレス駆動の高ボリューム法',
+    description: '100レップで筋肥大と内分泌反応',
     icon: '💪',
     type: 'recommended',
     category: 'strength',
@@ -97,7 +91,6 @@ export const TASKS: Task[] = [
     mainXp: 36,
     subXp: 9,
     frequency: 'weekly',
-    evidence: 'McCaulley 2008',
   },
   {
     id: 'cardio_obese',
@@ -110,7 +103,6 @@ export const TASKS: Task[] = [
     mainXp: 28,
     subXp: 7,
     frequency: 'daily',
-    evidence: 'Khoo 2013: +2.06 nmol/L',
   },
   {
     id: 'cardio_normal',
@@ -123,7 +115,6 @@ export const TASKS: Task[] = [
     mainXp: 16,
     subXp: 4,
     frequency: 'daily',
-    evidence: 'Kumagai 2016',
   },
   {
     id: 'walk_8k',
@@ -136,33 +127,6 @@ export const TASKS: Task[] = [
     mainXp: 12,
     subXp: 3,
     frequency: 'daily',
-    evidence: 'NHANES観察',
-  },
-  {
-    id: 'yoga',
-    name: 'ヨガ/ストレッチ 30-60分',
-    description: 'コルチゾール抑制でT/C比改善',
-    icon: '🧘‍♂️',
-    type: 'recommended',
-    category: 'mental',
-    subCategory: 'strength',
-    mainXp: 16,
-    subXp: 4,
-    frequency: 'daily',
-    evidence: 'Kasuyama 2020',
-  },
-  {
-    id: 'deload',
-    name: 'デロード週(8-12週毎の休養)',
-    description: '計画的休養で慢性Tが+19.2%',
-    icon: '🛌',
-    type: 'special',
-    category: 'sleep',
-    subCategory: 'strength',
-    mainXp: 16,
-    subXp: 4,
-    frequency: 'weekly',
-    evidence: 'Häkkinen',
   },
   {
     id: 'avoid_overtraining',
@@ -175,23 +139,9 @@ export const TASKS: Task[] = [
     mainXp: 16,
     subXp: 4,
     frequency: 'daily',
-    evidence: 'Hackney 2018: EHMC・T-30%',
   },
 
-  // B. 睡眠・休息(sleep) 8タスク
-  {
-    id: 'sleep_7h',
-    name: '7-9時間睡眠',
-    description: '最重要レバー。5h睡眠×1週でT-15%',
-    icon: '😴',
-    type: 'recommended',
-    category: 'sleep',
-    subCategory: 'mental',
-    mainXp: 32,
-    subXp: 8,
-    frequency: 'daily',
-    evidence: 'Leproult 2011 JAMA',
-  },
+  // B. 睡眠・休息(sleep) 5タスク
   {
     id: 'sleep_env',
     name: '深睡眠環境を整えた',
@@ -203,7 +153,6 @@ export const TASKS: Task[] = [
     mainXp: 12,
     subXp: 3,
     frequency: 'daily',
-    evidence: 'Luboshitzky 2001',
   },
   {
     id: 'bedtime_consistent',
@@ -214,7 +163,6 @@ export const TASKS: Task[] = [
     category: 'sleep',
     mainXp: 10,
     frequency: 'daily',
-    evidence: 'Luboshitzky 2001',
   },
   {
     id: 'power_nap',
@@ -227,7 +175,6 @@ export const TASKS: Task[] = [
     mainXp: 8,
     subXp: 2,
     frequency: 'optional',
-    evidence: 'Vgontzas 2007',
   },
   {
     id: 'screen_off',
@@ -240,33 +187,6 @@ export const TASKS: Task[] = [
     mainXp: 12,
     subXp: 3,
     frequency: 'daily',
-    evidence: 'Chang 2015 PNAS',
-  },
-  {
-    id: 'rest_day',
-    name: '完全休養日(週1-2回)',
-    description: '神経・内分泌系のリセット',
-    icon: '🛌',
-    type: 'special',
-    category: 'sleep',
-    subCategory: 'strength',
-    mainXp: 16,
-    subXp: 4,
-    frequency: 'weekly',
-    evidence: 'ガイドライン',
-  },
-  {
-    id: 'avoid_short_sleep',
-    name: '5時間未満睡眠を回避(最低6h確保)',
-    description: '1週間続くと約10-15歳分の老化相当',
-    icon: '🚫',
-    type: 'avoidance',
-    category: 'sleep',
-    subCategory: 'mental',
-    mainXp: 24,
-    subXp: 6,
-    frequency: 'daily',
-    evidence: 'Leproult 2011(★★★★★悪影響)',
   },
   {
     id: 'avoid_night_alcohol',
@@ -279,10 +199,9 @@ export const TASKS: Task[] = [
     mainXp: 12,
     subXp: 3,
     frequency: 'daily',
-    evidence: 'REM抑制の機序',
   },
 
-  // C. 栄養・食事(nutrition) 12タスク
+  // C. 栄養・食事(nutrition) 13タスク
   {
     id: 'protein_target',
     name: 'タンパク質1.6-2.0g/kg達成',
@@ -294,7 +213,6 @@ export const TASKS: Task[] = [
     mainXp: 16,
     subXp: 4,
     frequency: 'daily',
-    evidence: 'Whittaker 2022(メタ解析)',
   },
   {
     id: 'fat_30pct',
@@ -305,18 +223,16 @@ export const TASKS: Task[] = [
     category: 'nutrition',
     mainXp: 15,
     frequency: 'daily',
-    evidence: 'Whittaker 2021',
   },
   {
     id: 'eggs_2_3',
     name: '卵2-3個/日',
-    description: 'コレステロール+脂質+亜鉛の複合源',
+    description: 'T合成原料が一通り揃う',
     icon: '🥚',
     type: 'recommended',
     category: 'nutrition',
     mainXp: 10,
     frequency: 'daily',
-    evidence: '食品組成+脂質エビ',
   },
   {
     id: 'zinc_oyster',
@@ -327,7 +243,6 @@ export const TASKS: Task[] = [
     category: 'nutrition',
     mainXp: 15,
     frequency: 'weekly',
-    evidence: 'Te 2023(レビュー)',
   },
   {
     id: 'omega3_fish',
@@ -338,7 +253,6 @@ export const TASKS: Task[] = [
     category: 'nutrition',
     mainXp: 10,
     frequency: 'weekly',
-    evidence: 'Abbott 2020 RCT',
   },
   {
     id: 'cruciferous',
@@ -349,7 +263,6 @@ export const TASKS: Task[] = [
     category: 'nutrition',
     mainXp: 10,
     frequency: 'daily',
-    evidence: '観察+機序',
   },
   {
     id: 'olive_nuts',
@@ -360,7 +273,6 @@ export const TASKS: Task[] = [
     category: 'nutrition',
     mainXp: 10,
     frequency: 'daily',
-    evidence: 'Derouiche 2013',
   },
   {
     id: 'magnesium',
@@ -373,7 +285,6 @@ export const TASKS: Task[] = [
     mainXp: 8,
     subXp: 2,
     frequency: 'daily',
-    evidence: 'Cinar 2011(小RCT)',
   },
   {
     id: 'vitamin_d',
@@ -386,18 +297,28 @@ export const TASKS: Task[] = [
     mainXp: 8,
     subXp: 2,
     frequency: 'daily',
-    evidence: 'Zhao 2024(メタ解析)',
+  },
+  {
+    id: 'hydration',
+    name: '水分 2-3L摂取',
+    description: '脱水でコルチゾール上昇・運動効果消失',
+    icon: '💧',
+    type: 'recommended',
+    category: 'nutrition',
+    subCategory: 'mental',
+    mainXp: 8,
+    subXp: 2,
+    frequency: 'daily',
   },
   {
     id: 'avoid_sugar',
-    name: '加糖飲料/菓子25g未満を維持',
+    name: '加糖飲料/菓子25g未満',
     description: '急激な血糖変動でT一時低下',
     icon: '🚫',
     type: 'avoidance',
     category: 'nutrition',
     mainXp: 10,
     frequency: 'daily',
-    evidence: 'Caronia 2013',
   },
   {
     id: 'avoid_alcohol',
@@ -410,25 +331,25 @@ export const TASKS: Task[] = [
     mainXp: 16,
     subXp: 4,
     frequency: 'daily',
-    evidence: 'Smith 2023(★★★★悪影響)',
   },
   {
-    id: 'avoid_excess_protein',
-    name: '超高タンパク>3.4g/kgを避けた',
-    description: '過剰摂取はむしろT低下',
+    id: 'avoid_ultraprocessed',
+    name: '超加工食品/コンビニ食を避けた',
+    description: '同カロリーでもT低下(Cell Metab 2025)',
     icon: '🚫',
     type: 'avoidance',
     category: 'nutrition',
-    mainXp: 15,
+    subCategory: 'environment',
+    mainXp: 16,
+    subXp: 4,
     frequency: 'daily',
-    evidence: 'Whittaker 2022',
   },
 
   // D. 日光・環境(environment) 7タスク
   {
     id: 'morning_light',
     name: '朝10-30分外光(起床後1h以内)',
-    description: '概日リズムをリセット・コルチゾール正常化',
+    description: '概日リズムをリセット',
     icon: '🌅',
     type: 'recommended',
     category: 'environment',
@@ -436,7 +357,6 @@ export const TASKS: Task[] = [
     mainXp: 12,
     subXp: 3,
     frequency: 'daily',
-    evidence: 'Leproult 1997 / Figueiro 2017',
   },
   {
     id: 'uvb_exposure',
@@ -449,7 +369,6 @@ export const TASKS: Task[] = [
     mainXp: 8,
     subXp: 2,
     frequency: 'weekly',
-    evidence: 'Holick',
   },
   {
     id: 'loose_underwear',
@@ -460,7 +379,6 @@ export const TASKS: Task[] = [
     category: 'environment',
     mainXp: 5,
     frequency: 'daily',
-    evidence: 'Mínguez-Alarcón 2018',
   },
   {
     id: 'sauna',
@@ -473,12 +391,11 @@ export const TASKS: Task[] = [
     mainXp: 6,
     subXp: 2,
     frequency: 'weekly',
-    evidence: 'Podstawski 2021',
   },
   {
     id: 'cold_shower',
     name: '冷水シャワー2-5分',
-    description: '概日リズム調整(直接Tは議論あり)',
+    description: '概日リズム調整・メンタル耐性',
     icon: '🚿',
     type: 'recommended',
     category: 'environment',
@@ -486,18 +403,16 @@ export const TASKS: Task[] = [
     mainXp: 6,
     subXp: 2,
     frequency: 'optional',
-    evidence: '小規模研究で不一致',
   },
   {
     id: 'no_plastic',
     name: 'プラスチック容器→ガラス/ステンレス',
     description: 'フタル酸でT-4.76%(20-39歳男性)',
     icon: '🥛',
-    type: 'special',
+    type: 'recommended',
     category: 'environment',
     mainXp: 5,
     frequency: 'weekly',
-    evidence: 'Jacobson 2020',
   },
   {
     id: 'avoid_laptop_lap',
@@ -508,10 +423,9 @@ export const TASKS: Task[] = [
     category: 'environment',
     mainXp: 5,
     frequency: 'daily',
-    evidence: 'Sheynkin 2005',
   },
 
-  // E. 精神・マインド(mental) 11タスク
+  // E. 精神・マインド(mental) 14タスク
   {
     id: 'meditation',
     name: 'マインドフルネス瞑想10-20分',
@@ -523,7 +437,6 @@ export const TASKS: Task[] = [
     mainXp: 12,
     subXp: 3,
     frequency: 'daily',
-    evidence: 'Fan 2024 Stress(RCT)',
   },
   {
     id: 'cyclic_sigh',
@@ -534,7 +447,6 @@ export const TASKS: Task[] = [
     category: 'mental',
     mainXp: 10,
     frequency: 'daily',
-    evidence: 'Balban 2023 Cell Rep Med',
   },
   {
     id: 'box_breathing',
@@ -545,12 +457,11 @@ export const TASKS: Task[] = [
     category: 'mental',
     mainXp: 8,
     frequency: 'optional',
-    evidence: 'Ma 2017',
   },
   {
     id: 'competition_win',
-    name: '競争/勝利体験(勝負に勝つ)',
-    description: '勝利後にT急上昇',
+    name: '競争/勝利体験',
+    description: '勝利後にT急上昇(勝者効果)',
     icon: '🏆',
     type: 'recommended',
     category: 'mental',
@@ -558,7 +469,6 @@ export const TASKS: Task[] = [
     mainXp: 12,
     subXp: 3,
     frequency: 'optional',
-    evidence: 'Mazur & Booth 1998',
   },
   {
     id: 'deep_work',
@@ -569,20 +479,30 @@ export const TASKS: Task[] = [
     category: 'mental',
     mainXp: 12,
     frequency: 'daily',
-    evidence: 'Newport',
   },
   {
     id: 'forest_bathing',
     name: '森林浴/自然環境20分',
     description: 'フィトンチッド+ストレス低減',
     icon: '🌲',
-    type: 'special',
+    type: 'recommended',
     category: 'mental',
     subCategory: 'environment',
     mainXp: 8,
     subXp: 2,
     frequency: 'weekly',
-    evidence: 'Park 2010',
+  },
+  {
+    id: 'yoga',
+    name: 'ヨガ/ストレッチ 30-60分',
+    description: 'コルチゾール抑制でT/C比改善',
+    icon: '🧘‍♂️',
+    type: 'recommended',
+    category: 'mental',
+    subCategory: 'strength',
+    mainXp: 16,
+    subXp: 4,
+    frequency: 'daily',
   },
   {
     id: 'journal_morning',
@@ -593,7 +513,6 @@ export const TASKS: Task[] = [
     category: 'mental',
     mainXp: 5,
     frequency: 'daily',
-    evidence: 'Pennebaker(朝スロット)',
   },
   {
     id: 'journal_evening',
@@ -604,18 +523,38 @@ export const TASKS: Task[] = [
     category: 'mental',
     mainXp: 5,
     frequency: 'daily',
-    evidence: 'Pennebaker(夕スロット)',
   },
   {
     id: 'physical_touch',
-    name: 'パートナーとのスキンシップ(20秒ハグ等)',
+    name: 'パートナーとのスキンシップ',
     description: 'オキシトシン+T相乗作用',
     icon: '🤗',
     type: 'recommended',
     category: 'mental',
     mainXp: 8,
     frequency: 'optional',
-    evidence: 'Carmichael',
+  },
+  {
+    id: 'laughter',
+    name: '思い切り笑った',
+    description: 'コメディ視聴で唾液Tが有意上昇',
+    icon: '😂',
+    type: 'recommended',
+    category: 'mental',
+    mainXp: 8,
+    frequency: 'daily',
+  },
+  {
+    id: 'social_connection',
+    name: '友人と対面で交流',
+    description: '孤独はコルチゾール慢性化',
+    icon: '🤝',
+    type: 'recommended',
+    category: 'mental',
+    subCategory: 'sleep',
+    mainXp: 10,
+    subXp: 2,
+    frequency: 'optional',
   },
   {
     id: 'avoid_sns',
@@ -628,7 +567,6 @@ export const TASKS: Task[] = [
     mainXp: 8,
     subXp: 2,
     frequency: 'daily',
-    evidence: '睡眠経由',
   },
   {
     id: 'avoid_chronic_stress',
@@ -641,7 +579,6 @@ export const TASKS: Task[] = [
     mainXp: 12,
     subXp: 3,
     frequency: 'daily',
-    evidence: 'Sapolsky機序',
   },
 ];
 
