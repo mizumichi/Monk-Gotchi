@@ -5,8 +5,7 @@ import { client } from '@/lib/amplifyClient';
 import type { DailyLogSummary } from '@/lib/constraints';
 import { getTodayString, addDays } from '@/lib/constraints';
 
-// today を外から受け取ることで dateOverride に対応する
-export function useRecentLogs(enabled: boolean = true, days: number = 7, today?: string) {
+export function useRecentLogs(enabled: boolean = true, cycleStartDate?: string, today?: string) {
   const [logs, setLogs] = useState<DailyLogSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,7 +13,8 @@ export function useRecentLogs(enabled: boolean = true, days: number = 7, today?:
     try {
       setLoading(true);
       const effectiveToday = today ?? getTodayString();
-      const startDate = addDays(effectiveToday, -(days - 1));
+      // サイクル開始日から今日までを取得。未設定なら7日前をフォールバック
+      const startDate = cycleStartDate ?? addDays(effectiveToday, -6);
 
       const { data } = await client.models.DailyLog.list({
         filter: {
@@ -40,7 +40,7 @@ export function useRecentLogs(enabled: boolean = true, days: number = 7, today?:
     } finally {
       setLoading(false);
     }
-  }, [days, today]);
+  }, [cycleStartDate, today]);
 
   useEffect(() => {
     if (!enabled) return;

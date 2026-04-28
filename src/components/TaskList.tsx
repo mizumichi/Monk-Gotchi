@@ -26,6 +26,7 @@ interface Props {
   onNumericClear?: (taskId: string) => void;
   recentLogs?: DailyLogSummary[];
   today?: string;
+  cycleStartDate?: string;
 }
 
 export default function TaskList({
@@ -38,6 +39,7 @@ export default function TaskList({
   onNumericClear,
   recentLogs = [],
   today: todayProp,
+  cycleStartDate,
 }: Props) {
   const [activeCategory, setActiveCategory] = useState<Category>("strength");
   const [detailTask, setDetailTask] = useState<Task | null>(null);
@@ -48,10 +50,10 @@ export default function TaskList({
   const constraintMap = useMemo(() => {
     const map: Record<string, ReturnType<typeof checkConstraint>> = {};
     for (const task of TASKS) {
-      map[task.id] = checkConstraint(task, recentLogs, today);
+      map[task.id] = checkConstraint(task, recentLogs, today, cycleStartDate);
     }
     return map;
-  }, [recentLogs, today]);
+  }, [recentLogs, today, cycleStartDate]);
 
   const filteredTasks = TASKS.filter((t) => t.category === activeCategory);
 
@@ -187,7 +189,7 @@ export default function TaskList({
                         )}
                         {showCount && (
                           <span className="font-mono text-[10px] text-zinc-600">
-                            · 過去7日 {constraint.achievementCount}/{constraint.cycleLimit}回
+                            · このサイクル {constraint.achievementCount}/{constraint.cycleLimit}回
                           </span>
                         )}
                       </div>

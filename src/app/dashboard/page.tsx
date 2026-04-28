@@ -52,6 +52,7 @@ export default function DashboardPage() {
     stage,
     midType,
     finalType,
+    cycleStartDate,
     dateOverride,
     isLoading: characterLoading,
     numericValues,
@@ -66,7 +67,7 @@ export default function DashboardPage() {
   // dateOverride が変わるたびに再レンダーされるので、毎回実効日付を計算する
   const effectiveToday = getCurrentDateString();
 
-  const { logs: recentLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated, 7, effectiveToday);
+  const { logs: recentLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated, cycleStartDate, effectiveToday);
 
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -316,6 +317,7 @@ export default function DashboardPage() {
           onNumericClear={handleNumericClear}
           recentLogs={recentLogs}
           today={effectiveToday}
+          cycleStartDate={cycleStartDate}
         />
       </main>
     </div>

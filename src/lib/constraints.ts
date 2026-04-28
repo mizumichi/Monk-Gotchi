@@ -15,7 +15,8 @@ export interface ConstraintResult {
 export function checkConstraint(
   task: Task,
   recentLogs: DailyLogSummary[],
-  today: string
+  today: string,
+  cycleStartDate?: string
 ): ConstraintResult {
   if (!task.constraints) {
     return { blocked: false };
@@ -33,11 +34,11 @@ export function checkConstraint(
   }
 
   if (task.constraints.cycleLimit !== undefined) {
-    const count = countAchievements(task.id, recentLogs, today);
+    const count = countAchievements(task.id, recentLogs, today, cycleStartDate);
     if (count >= task.constraints.cycleLimit) {
       return {
         blocked: true,
-        reason: `過去7日で${count}回達成済みです(上限${task.constraints.cycleLimit}回)`,
+        reason: `このサイクルで${count}回達成済みです(上限${task.constraints.cycleLimit}回)`,
         achievementCount: count,
         cycleLimit: task.constraints.cycleLimit,
       };
@@ -55,11 +56,12 @@ export function checkConstraint(
 function countAchievements(
   taskId: string,
   recentLogs: DailyLogSummary[],
-  today: string
+  today: string,
+  cycleStartDate?: string
 ): number {
-  const sevenDaysAgo = addDays(today, -6);
+  const startDate = cycleStartDate ?? addDays(today, -6);
   return recentLogs.filter((log) => {
-    if (log.date < sevenDaysAgo || log.date > today) return false;
+    if (log.date < startDate || log.date > today) return false;
     return log.completedTaskIds.includes(taskId);
   }).length;
 }
