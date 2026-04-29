@@ -3,22 +3,34 @@
 import { useAuthenticator } from "@aws-amplify/ui-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
 import CharacterDisplay from "@/components/CharacterDisplay";
 import ScoreBars from "@/components/ScoreBars";
 import TaskList from "@/components/TaskList";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useRecentLogs } from "@/hooks/useRecentLogs";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
 import { CHARACTERS } from "@/data/characters";
-import { calcCategoryScores, type Category, type Task } from "@/data/tasks";
+import { TASKS, calcCategoryScores, type Category, type Task } from "@/data/tasks";
 import { calcSleepHoursXp } from "@/lib/sleepXp";
 import type { Schema } from "../../../amplify/data/resource";
 
 type DailyLog = Schema["DailyLog"]["type"];
 type Scores = Record<Category, number>;
+
+type TabKey = 'routine' | 'strength' | 'sleep' | 'nutrition' | 'environment' | 'mental';
+
+const TABS: { key: TabKey; label: string; icon: string }[] = [
+  { key: 'routine',     label: 'ルーティン', icon: '⭐' },
+  { key: 'strength',    label: '筋トレ',     icon: '💪' },
+  { key: 'sleep',       label: '睡眠',       icon: '😴' },
+  { key: 'nutrition',   label: '栄養',       icon: '🥩' },
+  { key: 'environment', label: '環境',       icon: '☀️' },
+  { key: 'mental',      label: '精神',       icon: '🧘' },
+];
 
 function computeScores(logs: DailyLog[]): Scores {
   const numericValues: Record<string, number> = {};
@@ -30,7 +42,6 @@ function computeScores(logs: DailyLog[]): Scores {
           : log.numericValues;
         if (nv && typeof nv[log.taskId] === 'number') {
           const ratio = calcSleepHoursXp(nv[log.taskId]);
-          // mainXp=40, subXp=10 for sleep_hours; use the stored ratio to derive per-category pts
           numericValues[`${log.taskId}_main`] = Math.round(40 * ratio);
           numericValues[`${log.taskId}_sub`] = Math.round(10 * ratio);
         }
@@ -64,17 +75,26 @@ export default function DashboardPage() {
     clearNumericValue,
   } = useCharacter(isAuthenticated);
 
-  // dateOverride が変わるたびに再レンダーされるので、毎回実効日付を計算する
   const effectiveToday = getCurrentDateString();
 
   const { logs: recentLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated, cycleStartDate, effectiveToday);
 
+  const { favoriteTaskIds, isFavorite, toggleFavorite } = useUserSettings();
+
+  const [activeTab, setActiveTab] = useState<TabKey>('routine');
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
   const [logsTrigger, setLogsTrigger] = useState(0);
   const [evolutionMessage, setEvolutionMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const filteredTasks = useMemo(() => {
+    if (activeTab === 'routine') {
+      return TASKS.filter((t) => favoriteTaskIds.includes(t.id));
+    }
+    return TASKS.filter((t) => t.category === activeTab);
+  }, [activeTab, favoriteTaskIds]);
 
   useEffect(() => {
     if (authStatus === "unauthenticated") {
@@ -133,12 +153,7 @@ export default function DashboardPage() {
   }
 
   async function handleReborn() {
-    const charName = finalType && finalType in CHARACTERS
-      ? CHARACTERS[finalType as keyof typeof CHARACTERS].name
-      : "このキャラ";
-    const ok = window.confirm(
-      `現在のキャラを図鑑に登録して、卵から育て直しますか？`
-    );
+    const ok = window.confirm(`現在のキャラを図鑑に登録して、卵から育て直しますか？`);
     if (!ok) return;
 
     setDailyLogs([]);
@@ -202,7 +217,6 @@ export default function DashboardPage() {
         return next;
       });
       refetchRecentLogs();
-      // タスク変更後に進化チェック (ステージ境界を跨いでいた場合に備えて)
       const result = await checkAndEvolve();
       if (result.evolved) {
         showEvolutionToast(result.newStage, result.midType, result.finalType);
@@ -292,7 +306,6 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {/* もう一度育てるボタン (最終形態のみ) */}
             {stage === "final" && (
               <button
                 onClick={handleReborn}
@@ -306,8 +319,27 @@ export default function DashboardPage() {
           <ScoreBars scores={scores} />
         </div>
 
+        {/* Tab bar */}
+        <div className="flex overflow-x-auto border border-zinc-800 bg-zinc-900 scrollbar-none -mx-0">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex-none px-3 py-2.5 font-mono text-xs flex items-center gap-1.5 transition-colors border-r border-zinc-800 last:border-r-0 whitespace-nowrap ${
+                activeTab === tab.key
+                  ? "bg-violet-600 text-white"
+                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+              }`}
+            >
+              <span className="leading-none">{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
         {/* Task list */}
         <TaskList
+          tasks={filteredTasks}
           checkedTaskIds={checkedTaskIds}
           pendingTaskIds={pendingTaskIds}
           onToggle={handleToggle}
@@ -318,6 +350,9 @@ export default function DashboardPage() {
           recentLogs={recentLogs}
           today={effectiveToday}
           cycleStartDate={cycleStartDate}
+          isFavorite={isFavorite}
+          toggleFavorite={toggleFavorite}
+          isRoutineTab={activeTab === 'routine'}
         />
       </main>
     </div>

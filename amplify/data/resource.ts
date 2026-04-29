@@ -39,6 +39,12 @@ const schema = a.schema({
       obtainedCount: a.integer().required().default(1),
     })
     .authorization((allow) => [allow.owner()]),
+
+  UserSettings: a
+    .model({
+      favoriteTaskIds: a.string().array(),
+    })
+    .authorization((allow) => [allow.owner()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

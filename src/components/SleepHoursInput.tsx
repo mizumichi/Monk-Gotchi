@@ -16,18 +16,22 @@ interface Props {
   task: Task;
   currentValue: number | null;
   isCompleted: boolean;
+  isFavorite: boolean;
   onSubmit: (taskId: string, value: number) => void;
   onClear: (taskId: string) => void;
   onOpenDetail: () => void;
+  onToggleFavorite: () => void;
 }
 
 export default function SleepHoursInput({
   task,
   currentValue,
   isCompleted,
+  isFavorite,
   onSubmit,
   onClear,
   onOpenDetail,
+  onToggleFavorite,
 }: Props) {
   const typeMeta = TYPE_META[task.type];
   const catMeta = CATEGORY_META[task.category];
@@ -47,6 +51,17 @@ export default function SleepHoursInput({
       style={{ borderLeft: `4px solid ${typeMeta.borderColor}`, paddingLeft: '12px' }}
     >
       <div className="flex items-start gap-3">
+        {/* ★ button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+          aria-label={isFavorite ? 'お気に入りから外す' : 'お気に入りに追加'}
+          className="flex-none w-6 h-6 flex items-center justify-center text-base leading-none transition-colors mt-0.5"
+        >
+          <span className={isFavorite ? 'text-amber-400' : 'text-zinc-600 hover:text-amber-400'}>
+            {isFavorite ? '★' : '☆'}
+          </span>
+        </button>
+
         {/* Icon */}
         <span className="text-2xl leading-none flex-none mt-0.5" role="img" aria-hidden>
           {task.icon}
