@@ -45,6 +45,15 @@ const schema = a.schema({
       favoriteTaskIds: a.string().array(),
     })
     .authorization((allow) => [allow.owner()]),
+
+  Journal: a
+    .model({
+      date: a.date().required(),
+      slot: a.string().required(), // 'morning' | 'evening'
+      mood: a.integer().required(),
+      text: a.string(),
+    })
+    .authorization((allow) => [allow.owner()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

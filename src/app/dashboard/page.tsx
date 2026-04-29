@@ -9,6 +9,7 @@ import CharacterDisplay from "@/components/CharacterDisplay";
 import ScoreBars from "@/components/ScoreBars";
 import TaskList from "@/components/TaskList";
 import { useCharacter } from "@/hooks/useCharacter";
+import { useJournal } from "@/hooks/useJournal";
 import { useRecentLogs } from "@/hooks/useRecentLogs";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
@@ -78,6 +79,7 @@ export default function DashboardPage() {
   const effectiveToday = getCurrentDateString();
 
   const { logs: recentLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated, cycleStartDate, effectiveToday);
+  const { journals, saveJournal, deleteJournal } = useJournal(effectiveToday);
 
   const { favoriteTaskIds, isFavorite, toggleFavorite } = useUserSettings();
 
@@ -186,6 +188,42 @@ export default function DashboardPage() {
   async function handleNumericClear(taskId: string) {
     await clearNumericValue(taskId);
     setLogsTrigger((n) => n + 1);
+    refetchRecentLogs();
+  }
+
+  async function handleJournalSave(slot: 'morning' | 'evening', mood: number, text: string) {
+    const { created } = await saveJournal(slot, mood, text);
+    if (created) {
+      const { userId } = await getCurrentUser();
+      const taskId = slot === 'morning' ? 'journal_morning' : 'journal_evening';
+      const task = TASKS.find((t) => t.id === taskId);
+      if (task) {
+        const today = getCurrentDateString();
+        const { data } = await client.models.DailyLog.create({
+          userId,
+          date: today,
+          taskId,
+          points: task.mainXp,
+          completedAt: new Date().toISOString(),
+        });
+        if (data) setDailyLogs((prev) => [...prev, data]);
+      }
+    }
+    refetchRecentLogs();
+    const result = await checkAndEvolve();
+    if (result.evolved) {
+      showEvolutionToast(result.newStage, result.midType, result.finalType);
+    }
+  }
+
+  async function handleJournalDelete(slot: 'morning' | 'evening') {
+    await deleteJournal(slot);
+    const taskId = slot === 'morning' ? 'journal_morning' : 'journal_evening';
+    const existing = dailyLogs.find((log) => log.taskId === taskId);
+    if (existing) {
+      await client.models.DailyLog.delete({ id: existing.id });
+      setDailyLogs((prev) => prev.filter((log) => log.id !== existing.id));
+    }
     refetchRecentLogs();
   }
 
@@ -353,6 +391,9 @@ export default function DashboardPage() {
           isFavorite={isFavorite}
           toggleFavorite={toggleFavorite}
           isRoutineTab={activeTab === 'routine'}
+          journals={journals}
+          onJournalSave={handleJournalSave}
+          onJournalDelete={handleJournalDelete}
         />
       </main>
     </div>

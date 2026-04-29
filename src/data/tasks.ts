@@ -4,7 +4,7 @@ export type TaskType = 'recommended' | 'avoidance';
 
 export type TaskFrequency = 'daily' | 'weekly' | 'optional';
 
-export type TaskKind = 'check' | 'numeric';
+export type TaskKind = 'check' | 'numeric' | 'journal';
 
 export interface TaskConstraints {
   noNextDay?: boolean;
@@ -543,6 +543,7 @@ export const TASKS: Task[] = [
     category: 'mental',
     mainXp: 5,
     frequency: 'daily',
+    taskKind: 'journal',
   },
   {
     id: 'journal_evening',
@@ -553,6 +554,7 @@ export const TASKS: Task[] = [
     category: 'mental',
     mainXp: 5,
     frequency: 'daily',
+    taskKind: 'journal',
   },
   {
     id: 'physical_touch',

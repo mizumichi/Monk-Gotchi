@@ -14,6 +14,13 @@ import {
 } from "@/lib/constraints";
 import TaskDetailModal from "@/components/TaskDetailModal";
 import SleepHoursInput from "@/components/SleepHoursInput";
+import JournalModal from "@/components/JournalModal";
+
+interface JournalEntry {
+  id: string;
+  mood: number;
+  text: string | null;
+}
 
 interface Props {
   tasks: Task[];
@@ -30,6 +37,9 @@ interface Props {
   isFavorite: (taskId: string) => boolean;
   toggleFavorite: (taskId: string) => void;
   isRoutineTab?: boolean;
+  journals?: Record<string, JournalEntry | null>;
+  onJournalSave?: (slot: 'morning' | 'evening', mood: number, text: string) => Promise<void>;
+  onJournalDelete?: (slot: 'morning' | 'evening') => Promise<void>;
 }
 
 export default function TaskList({
@@ -47,9 +57,13 @@ export default function TaskList({
   isFavorite,
   toggleFavorite,
   isRoutineTab = false,
+  journals = {},
+  onJournalSave,
+  onJournalDelete,
 }: Props) {
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [expandedReasonId, setExpandedReasonId] = useState<string | null>(null);
+  const [journalTask, setJournalTask] = useState<Task | null>(null);
 
   const today = todayProp ?? getTodayString();
 
@@ -82,6 +96,14 @@ export default function TaskList({
           </p>
         </div>
         <TaskDetailModal task={detailTask} onClose={() => setDetailTask(null)} />
+        <JournalModal
+          task={journalTask}
+          slot={journalTask?.id === 'journal_morning' ? 'morning' : journalTask ? 'evening' : null}
+          existing={journalTask ? (journals[journalTask.id === 'journal_morning' ? 'morning' : 'evening'] ?? null) : null}
+          onSave={onJournalSave ?? (async () => {})}
+          onDelete={onJournalDelete ?? (async () => {})}
+          onClose={() => setJournalTask(null)}
+        />
       </>
     );
   }
@@ -126,6 +148,98 @@ export default function TaskList({
                   onOpenDetail={() => setDetailTask(task)}
                   onToggleFavorite={() => toggleFavorite(task.id)}
                 />
+              );
+            }
+
+            if (task.taskKind === 'journal') {
+              const slot = task.id === 'journal_morning' ? 'morning' : 'evening';
+              const entry = journals[slot] ?? null;
+              const isRecorded = entry !== null;
+              return (
+                <div
+                  key={task.id}
+                  className="flex flex-col bg-zinc-900 pr-2 py-3.5 hover:bg-zinc-800/60 transition-colors"
+                  style={{ borderLeft: `4px solid ${typeMeta.borderColor}`, paddingLeft: '8px' }}
+                >
+                  <div className="flex items-center gap-2">
+                    {/* ★ button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleFavorite(task.id); }}
+                      aria-label={fav ? 'お気に入りから外す' : 'お気に入りに追加'}
+                      className="flex-none w-6 h-6 flex items-center justify-center text-base leading-none transition-colors"
+                    >
+                      <span className={fav ? 'text-amber-400' : 'text-zinc-600 hover:text-amber-400'}>
+                        {fav ? '★' : '☆'}
+                      </span>
+                    </button>
+
+                    {/* Icon */}
+                    <div className="flex-none">
+                      <span className="text-2xl leading-none" role="img" aria-hidden>{task.icon}</span>
+                    </div>
+
+                    {/* Text */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-mono text-sm ${isRecorded ? 'text-zinc-400' : 'text-zinc-100'}`}>
+                        {task.name}
+                      </p>
+                      {isRecorded && entry ? (
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="font-mono text-xs text-emerald-500">
+                            ✓ 気分 {entry.mood}/10
+                          </span>
+                          {entry.text && (
+                            <span className="font-mono text-xs text-zinc-500 truncate max-w-[160px]">
+                              {entry.text}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="font-mono text-xs text-zinc-500 mt-0.5 truncate">
+                          {task.description}
+                        </p>
+                      )}
+                      {!isRecorded && (
+                        <span className="font-mono text-xs text-violet-400 mt-1 block">
+                          +{task.mainXp} {catMeta.icon}{catMeta.label}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* ⓘ button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
+                      aria-label="詳細を見る"
+                      className="flex-none w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-violet-400 transition-colors text-base"
+                    >
+                      ⓘ
+                    </button>
+
+                    {/* Journal open button */}
+                    <div className="flex-none flex flex-col items-center gap-0.5">
+                      <button
+                        onClick={() => setJournalTask(task)}
+                        aria-label={isRecorded ? `${task.name}を編集` : `${task.name}を記録`}
+                        className={`w-6 h-6 rounded-full border-2 transition-colors flex items-center justify-center ${
+                          isRecorded
+                            ? 'border-emerald-500 bg-emerald-500 hover:bg-emerald-400 hover:border-emerald-400'
+                            : 'border-zinc-600 hover:border-violet-400'
+                        }`}
+                      >
+                        {isRecorded ? (
+                          <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        ) : (
+                          <span className="text-[10px] text-zinc-400">📓</span>
+                        )}
+                      </button>
+                      <span className="font-mono text-[9px] text-zinc-600 whitespace-nowrap">
+                        {isRecorded ? '編集' : '記録'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               );
             }
 
@@ -294,6 +408,14 @@ export default function TaskList({
       </div>
 
       <TaskDetailModal task={detailTask} onClose={() => setDetailTask(null)} />
+      <JournalModal
+        task={journalTask}
+        slot={journalTask?.id === 'journal_morning' ? 'morning' : journalTask ? 'evening' : null}
+        existing={journalTask ? (journals[journalTask.id === 'journal_morning' ? 'morning' : 'evening'] ?? null) : null}
+        onSave={onJournalSave ?? (async () => {})}
+        onDelete={onJournalDelete ?? (async () => {})}
+        onClose={() => setJournalTask(null)}
+      />
     </>
   );
 }
