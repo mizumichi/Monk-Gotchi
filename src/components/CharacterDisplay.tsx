@@ -2,7 +2,11 @@
 
 import { useEffect } from "react";
 import type { Stage } from "@/lib/date";
-import { CHARACTERS, type CharacterId } from "@/data/characters";
+import {
+  getCharacterByCode,
+  resolveCharacterCode,
+  type CharacterMaster,
+} from "@/data/characters";
 
 interface Props {
   dayNumber: number;
@@ -11,27 +15,38 @@ interface Props {
   finalType?: string | null;
 }
 
-function resolveCharacterId(
+const FALLBACK: CharacterMaster = {
+  code: 'Monk-Egg',
+  nameJp: '不明なキャラ',
+  stage: 'egg',
+  tier: 'progress',
+  emoji: '❓',
+  description: '',
+  conditionText: '',
+};
+
+function resolveDisplayCharacter(
   stage: Stage,
   midType: string | null | undefined,
   finalType: string | null | undefined
-): CharacterId {
-  if (stage === "egg") return "egg";
-  if (stage === "early") return "early";
-  if (stage === "mid") {
-    if (midType && midType in CHARACTERS) return midType as CharacterId;
-    return "normal";
+): CharacterMaster {
+  if (stage === 'egg') return getCharacterByCode('Monk-Egg') ?? FALLBACK;
+  if (stage === 'early') return getCharacterByCode('Monk-Baby') ?? FALLBACK;
+
+  if (stage === 'mid') {
+    const code = resolveCharacterCode(midType);
+    const char = getCharacterByCode(code);
+    return char?.stage === 'mid' ? char : (getCharacterByCode('Heibon-Monk') ?? FALLBACK);
   }
-  if (stage === "final") {
-    if (finalType && finalType in CHARACTERS) return finalType as CharacterId;
-    return "average";
-  }
-  return "egg";
+
+  // final
+  const code = resolveCharacterCode(finalType);
+  const char = getCharacterByCode(code);
+  return char?.stage === 'final' ? char : (getCharacterByCode('Average-San') ?? FALLBACK);
 }
 
 export default function CharacterDisplay({ dayNumber, stage, midType, finalType }: Props) {
-  const charId = resolveCharacterId(stage, midType, finalType);
-  const char = CHARACTERS[charId];
+  const char = resolveDisplayCharacter(stage, midType, finalType);
 
   useEffect(() => {
     console.log("[CharacterDisplay] dayNumber:", dayNumber, "stage:", stage, "midType:", midType, "finalType:", finalType);
@@ -42,12 +57,12 @@ export default function CharacterDisplay({ dayNumber, stage, midType, finalType 
       <div
         className="text-7xl leading-none select-none"
         role="img"
-        aria-label={`キャラクター: ${char.name}`}
+        aria-label={`キャラクター: ${char.nameJp}`}
       >
         {char.emoji}
       </div>
       <p className="font-mono font-bold text-zinc-100 text-sm tracking-wide">
-        {char.name}
+        {char.nameJp}
       </p>
       <p className="font-mono text-xs text-violet-400 tracking-widest">
         Day {dayNumber} / 7

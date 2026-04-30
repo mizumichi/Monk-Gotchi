@@ -14,7 +14,7 @@ import { useRecentLogs } from "@/hooks/useRecentLogs";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
-import { CHARACTERS } from "@/data/characters";
+import { getCharacterByCode, resolveCharacterCode } from "@/data/characters";
 import { TASKS, calcCategoryScores, type Category, type Task } from "@/data/tasks";
 import { calcSleepHoursXp } from "@/lib/sleepXp";
 import type { Schema } from "../../../amplify/data/resource";
@@ -127,16 +127,9 @@ export default function DashboardPage() {
 
   function showEvolutionToast(newStage?: string, newMidType?: string, newFinalType?: string) {
     if (!newStage) return;
-    let charKey: keyof typeof CHARACTERS = "egg";
-    if (newStage === "mid" && newMidType && newMidType in CHARACTERS) {
-      charKey = newMidType as keyof typeof CHARACTERS;
-    } else if (newStage === "final" && newFinalType && newFinalType in CHARACTERS) {
-      charKey = newFinalType as keyof typeof CHARACTERS;
-    } else if (newStage in CHARACTERS) {
-      charKey = newStage as keyof typeof CHARACTERS;
-    }
-    const char = CHARACTERS[charKey];
-    showToast(`進化した！ ${char.emoji} ${char.name} が生まれた！`);
+    const rawCode = newStage === "mid" ? newMidType : newStage === "final" ? newFinalType : newStage;
+    const char = getCharacterByCode(resolveCharacterCode(rawCode));
+    showToast(`進化した！ ${char?.emoji ?? ''} ${char?.nameJp ?? newStage} が生まれた！`);
   }
 
   async function handleAdvanceDay() {
@@ -162,9 +155,8 @@ export default function DashboardPage() {
     const result = await rebornAsEgg();
     setLogsTrigger((n) => n + 1);
     if (result.success && result.recordedType) {
-      const recorded = result.recordedType in CHARACTERS
-        ? CHARACTERS[result.recordedType as keyof typeof CHARACTERS].name
-        : result.recordedType;
+      const char = getCharacterByCode(resolveCharacterCode(result.recordedType));
+      const recorded = char ? char.nameJp : result.recordedType;
       showToast(`図鑑に ${recorded} を登録しました`);
     }
   }
