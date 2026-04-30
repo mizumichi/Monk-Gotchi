@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
 import { client } from "@/lib/amplifyClient";
 import {
@@ -11,6 +11,7 @@ import {
   getStage,
   type Stage,
 } from "@/lib/date";
+import { getCycleInfo, type CycleInfo } from "@/lib/cycle";
 import { checkEvolution } from "@/lib/evolution";
 import { calcSleepHoursXp } from "@/lib/sleepXp";
 import { getTaskById } from "@/data/tasks";
@@ -34,6 +35,7 @@ export interface UseCharacterResult {
   character: Character | null;
   dayNumber: number;
   stage: Stage;
+  cycleInfo: CycleInfo;
   midType: string | null | undefined;
   finalType: string | null | undefined;
   cycleStartDate: string;
@@ -132,6 +134,10 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
   const cycleStartDate = character?.cycleStartDate ?? today;
   const dayNumber = calculateDayNumber(cycleStartDate);
   const stage = getStage(dayNumber);
+  const cycleInfo = useMemo(
+    () => getCycleInfo(character?.cycleStartDate),
+    [character?.cycleStartDate]
+  );
 
   // キャラの進化をDBに反映し、結果を返す内部ヘルパー
   const applyEvolution = useCallback(
@@ -330,6 +336,7 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
     character,
     dayNumber,
     stage,
+    cycleInfo,
     midType: character?.midType,
     finalType: character?.finalType,
     cycleStartDate,

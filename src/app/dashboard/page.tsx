@@ -15,6 +15,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
 import { getCharacterByCode, resolveCharacterCode } from "@/data/characters";
+import { formatDayLabel } from "@/lib/cycle";
 import { TASKS, calcCategoryScores, type Category, type Task } from "@/data/tasks";
 import { calcSleepHoursXp } from "@/lib/sleepXp";
 import type { Schema } from "../../../amplify/data/resource";
@@ -62,6 +63,7 @@ export default function DashboardPage() {
   const {
     dayNumber,
     stage,
+    cycleInfo,
     midType,
     finalType,
     cycleStartDate,
@@ -319,6 +321,9 @@ export default function DashboardPage() {
               midType={midType}
               finalType={finalType}
             />
+            <p className="font-mono text-xs text-zinc-400 tracking-wider">
+              {formatDayLabel(cycleInfo)}
+            </p>
             <div className="flex gap-1">
               <button
                 onClick={handleAdvanceDay}
@@ -336,14 +341,29 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            {stage === "final" && (
-              <button
-                onClick={handleReborn}
-                disabled={characterLoading}
-                className="mt-2 font-mono text-sm text-violet-300 hover:text-white border-2 border-violet-600 hover:border-violet-400 hover:bg-violet-900/30 px-4 py-2 transition-colors disabled:opacity-30 w-full"
-              >
-                🥚 もう一度育てる
-              </button>
+            {(cycleInfo.phase === 'final' || cycleInfo.isOverflow) && (
+              <div className="flex flex-col items-center gap-1 mt-1 w-full">
+                {cycleInfo.isOverflow ? (
+                  <p className="font-mono text-[10px] text-amber-400">
+                    休憩中・新サイクル開始待ち
+                  </p>
+                ) : (
+                  <p className="font-mono text-[10px] text-zinc-500">
+                    今日は休憩日です
+                  </p>
+                )}
+                <button
+                  onClick={handleReborn}
+                  disabled={characterLoading}
+                  className={`font-mono text-sm border-2 px-4 py-2 transition-colors disabled:opacity-30 w-full ${
+                    cycleInfo.isOverflow
+                      ? 'text-amber-300 hover:text-white border-amber-600 hover:border-amber-400 hover:bg-amber-900/30'
+                      : 'text-violet-300 hover:text-white border-violet-600 hover:border-violet-400 hover:bg-violet-900/30'
+                  }`}
+                >
+                  🥚 もう一度育てる
+                </button>
+              </div>
             )}
           </div>
           <ScoreBars scores={scores} />
