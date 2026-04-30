@@ -12,12 +12,13 @@ import {
   type Stage,
 } from "@/lib/date";
 import { getCycleInfo, type CycleInfo } from "@/lib/cycle";
-import { checkEvolution } from "@/lib/evolution";
+import { evolveMid, evolveFinal, type DailyLogLike } from "@/lib/evolution";
 import { calcSleepHoursXp } from "@/lib/sleepXp";
 import { getTaskById } from "@/data/tasks";
 import type { Schema } from "../../amplify/data/resource";
 
 type Character = Schema["Character"]["type"];
+type AmplifyDailyLog = Schema["DailyLog"]["type"];
 
 export interface AdvanceDayResult {
   evolved: boolean;
@@ -43,6 +44,8 @@ export interface UseCharacterResult {
   isLoading: boolean;
   error: Error | null;
   numericValues: Record<string, number>;
+  evolutionCode: { code: string; phase: 'mid' | 'final' } | null;
+  clearEvolutionCode: () => void;
   refetch: () => Promise<void>;
   advanceDay: () => Promise<AdvanceDayResult>;
   checkAndEvolve: () => Promise<AdvanceDayResult>;
@@ -52,11 +55,36 @@ export interface UseCharacterResult {
   clearNumericValue: (taskId: string) => Promise<void>;
 }
 
+function toLogLike(amplifyLogs: AmplifyDailyLog[]): DailyLogLike[] {
+  const byDate = new Map<string, DailyLogLike>();
+  for (const log of amplifyLogs) {
+    const entry = byDate.get(log.date) ?? { date: log.date, completedTaskIds: [], numericValues: {} };
+    entry.completedTaskIds.push(log.taskId);
+    if (log.numericValues) {
+      try {
+        const nv = typeof log.numericValues === 'string'
+          ? JSON.parse(log.numericValues)
+          : log.numericValues;
+        if (nv && typeof nv === 'object' && !Array.isArray(nv)) {
+          for (const [k, v] of Object.entries(nv)) {
+            if (typeof v === 'number' && entry.numericValues) {
+              entry.numericValues[k] = v;
+            }
+          }
+        }
+      } catch { /* skip malformed */ }
+    }
+    byDate.set(log.date, entry);
+  }
+  return Array.from(byDate.values());
+}
+
 export function useCharacter(enabled: boolean = true): UseCharacterResult {
   const [character, setCharacter] = useState<Character | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [numericValues, setNumericValues] = useState<Record<string, number>>({});
+  const [evolutionCode, setEvolutionCode] = useState<{ code: string; phase: 'mid' | 'final' } | null>(null);
   const [dateOverride, setDateOverrideState] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("dateOverride");
@@ -136,41 +164,66 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
   const stage = getStage(dayNumber);
   const cycleInfo = getCycleInfo(character?.cycleStartDate);
 
-  // キャラの進化をDBに反映し、結果を返す内部ヘルパー
-  const applyEvolution = useCallback(
-    async (char: Character): Promise<AdvanceDayResult> => {
+  // Phase-based evolution trigger
+  useEffect(() => {
+    if (!character || !enabled) return;
+    const { phase } = cycleInfo;
+    const startDate = character.cycleStartDate;
+    const charId = character.id;
+    const currentMidType = character.midType;
+    const currentFinalType = character.finalType;
+    if (!startDate) return;
+
+    const shouldEvolveMid = phase === 'mid' && !currentMidType;
+    const shouldEvolveFinal = (phase === 'final' || phase === 'overflow') && !currentFinalType;
+    if (!shouldEvolveMid && !shouldEvolveFinal) return;
+
+    let cancelled = false;
+    async function runEvolution() {
       try {
         const { data: allLogs } = await client.models.DailyLog.list();
-        const result = checkEvolution(char, allLogs ?? []);
-        if (!result) return { evolved: false };
-
-        const { data: evolved } = await client.models.Character.update({
-          id: char.id,
-          stage: result.stage,
-          ...(result.midType != null && { midType: result.midType }),
-          ...(result.finalType != null && { finalType: result.finalType }),
-        });
-        if (evolved) setCharacter(evolved);
-
-        console.log("[applyEvolution] evolved to:", result.stage, result.midType, result.finalType);
-        return {
-          evolved: true,
-          newStage: result.stage,
-          midType: result.midType,
-          finalType: result.finalType,
-        };
+        if (cancelled) return;
+        const logs = toLogLike(allLogs ?? []);
+        if (shouldEvolveMid) {
+          const result = evolveMid(logs, startDate);
+          console.log("[useCharacter] evolveMid →", result.code, result.debug);
+          const { data: updated } = await client.models.Character.update({
+            id: charId,
+            stage: 'mid',
+            midType: result.code,
+          });
+          if (!cancelled && updated) {
+            setCharacter(updated);
+            setEvolutionCode({ code: result.code, phase: 'mid' });
+          }
+        } else {
+          const result = evolveFinal(logs, startDate);
+          console.log("[useCharacter] evolveFinal →", result.code, result.debug);
+          const { data: updated } = await client.models.Character.update({
+            id: charId,
+            stage: 'final',
+            finalType: result.code,
+          });
+          if (!cancelled && updated) {
+            setCharacter(updated);
+            setEvolutionCode({ code: result.code, phase: 'final' });
+          }
+        }
       } catch (err) {
-        console.error("[applyEvolution] error:", err);
-        return { evolved: false };
+        console.error("[useCharacter] evolution error:", err);
       }
-    },
-    []
-  );
+    }
+    runEvolution();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [character?.id, cycleInfo.phase, character?.midType, character?.finalType, enabled]);
+
+  const clearEvolutionCode = useCallback(() => setEvolutionCode(null), []);
 
   const checkAndEvolve = useCallback(async (): Promise<AdvanceDayResult> => {
-    if (!character) return { evolved: false };
-    return applyEvolution(character);
-  }, [character, applyEvolution]);
+    // Evolution is now triggered automatically by the phase-based useEffect
+    return { evolved: false };
+  }, []);
 
   const advanceDay = useCallback(async (): Promise<AdvanceDayResult> => {
     if (!character) {
@@ -178,9 +231,6 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
       return { evolved: false };
     }
     try {
-      // dateOverride を1日進めるだけ。
-      // dayNumber = today(=dateOverride) - cycleStartDate + 1 なので、
-      // cycleStartDate も同時にずらすと +2日になってしまうため cycleStartDate は触らない。
       const currentDateStr = getCurrentDateString();
       const currentDateObj = new Date(currentDateStr + "T00:00:00Z");
       currentDateObj.setUTCDate(currentDateObj.getUTCDate() + 1);
@@ -188,15 +238,12 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
       setDateOverride(newDateOverride);
       setDateOverrideState(newDateOverride);
       console.log("[advanceDay] dateOverride →", newDateOverride);
-
-      // localStorage に書いた直後に applyEvolution を呼ぶと
-      // calculateDayNumber → getCurrentDateString() が新しい dateOverride を参照する
-      return applyEvolution(character);
+      return { evolved: false };
     } catch (err) {
       console.error("[advanceDay] exception:", err);
       return { evolved: false };
     }
-  }, [character, applyEvolution]);
+  }, [character]);
 
   const resetDate = useCallback(async () => {
     if (!character) return;
@@ -220,8 +267,8 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
   }, [character]);
 
   const rebornAsEgg = useCallback(async (): Promise<RebornResult> => {
-    if (!character?.finalType) {
-      console.log("[rebornAsEgg] finalType is not set, skipping");
+    if (!character) {
+      console.log("[rebornAsEgg] character is null, skipping");
       return { success: false };
     }
     const finalType = character.finalType;
@@ -229,31 +276,33 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
     const today = getRealCurrentDateString();
 
     try {
-      // CharacterDex を確認して upsert
-      const { data: dexList } = await client.models.CharacterDex.list({
-        filter: { characterType: { eq: finalType } },
-      });
+      // Record to CharacterDex only when finalType is set
+      if (finalType) {
+        const { data: dexList } = await client.models.CharacterDex.list({
+          filter: { characterType: { eq: finalType } },
+        });
 
-      if (dexList && dexList.length > 0) {
-        await client.models.CharacterDex.update({
-          id: dexList[0].id,
-          obtainedCount: (dexList[0].obtainedCount ?? 1) + 1,
-          lastObtainedAt: now,
-        });
-        console.log("[rebornAsEgg] dex updated for:", finalType, "count:", (dexList[0].obtainedCount ?? 1) + 1);
-      } else {
-        await client.models.CharacterDex.create({
-          characterType: finalType,
-          firstObtainedAt: now,
-          lastObtainedAt: now,
-          obtainedCount: 1,
-        });
-        console.log("[rebornAsEgg] dex created for:", finalType);
+        if (dexList && dexList.length > 0) {
+          await client.models.CharacterDex.update({
+            id: dexList[0].id,
+            obtainedCount: (dexList[0].obtainedCount ?? 1) + 1,
+            lastObtainedAt: now,
+          });
+          console.log("[rebornAsEgg] dex updated for:", finalType, "count:", (dexList[0].obtainedCount ?? 1) + 1);
+        } else {
+          await client.models.CharacterDex.create({
+            characterType: finalType,
+            firstObtainedAt: now,
+            lastObtainedAt: now,
+            obtainedCount: 1,
+          });
+          console.log("[rebornAsEgg] dex created for:", finalType);
+        }
       }
 
-      // dateOverride をクリアして Character を卵にリセット
       setDateOverride(null);
       setDateOverrideState(null);
+      setEvolutionCode(null);
 
       const { data: updated } = await client.models.Character.update({
         id: character.id,
@@ -264,7 +313,7 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
       });
       if (updated) setCharacter(updated);
 
-      return { success: true, recordedType: finalType };
+      return { success: true, recordedType: finalType ?? undefined };
     } catch (err) {
       console.error("[rebornAsEgg] error:", err);
       return { success: false };
@@ -341,6 +390,8 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
     isLoading,
     error,
     numericValues,
+    evolutionCode,
+    clearEvolutionCode,
     refetch: fetchOrCreate,
     advanceDay,
     checkAndEvolve,

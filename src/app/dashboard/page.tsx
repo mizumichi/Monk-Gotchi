@@ -15,9 +15,11 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
 import { getCharacterByCode, resolveCharacterCode } from "@/data/characters";
-import { formatDayLabel } from "@/lib/cycle";
-import { TASKS, calcCategoryScores, type Category, type Task } from "@/data/tasks";
+import { formatDayLabel, type CyclePhase } from "@/lib/cycle";
+import { buildAggregatesForDays, type DailyLogLike } from "@/lib/evolution";
+import { TASKS, calcCategoryScores, type Category, type Task, getTaskById } from "@/data/tasks";
 import { calcSleepHoursXp } from "@/lib/sleepXp";
+import type { Stage } from "@/lib/date";
 import type { Schema } from "../../../amplify/data/resource";
 
 type DailyLog = Schema["DailyLog"]["type"];
@@ -34,6 +36,13 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'mental',      label: '精神',       icon: '🧘' },
 ];
 
+function phaseToDisplayStage(phase: CyclePhase): Stage {
+  if (phase === 'egg') return 'egg';
+  if (phase === 'baby') return 'early';
+  if (phase === 'mid') return 'mid';
+  return 'final';
+}
+
 function computeScores(logs: DailyLog[]): Scores {
   const numericValues: Record<string, number> = {};
   for (const log of logs) {
@@ -43,9 +52,12 @@ function computeScores(logs: DailyLog[]): Scores {
           ? JSON.parse(log.numericValues)
           : log.numericValues;
         if (nv && typeof nv[log.taskId] === 'number') {
+          const task = getTaskById(log.taskId);
           const ratio = calcSleepHoursXp(nv[log.taskId]);
-          numericValues[`${log.taskId}_main`] = Math.round(40 * ratio);
-          numericValues[`${log.taskId}_sub`] = Math.round(10 * ratio);
+          numericValues[`${log.taskId}_main`] = Math.round((task?.mainXp ?? 40) * ratio);
+          if (task?.subXp != null) {
+            numericValues[`${log.taskId}_sub`] = Math.round(task.subXp * ratio);
+          }
         }
       } catch { /* skip */ }
     }
@@ -70,8 +82,9 @@ export default function DashboardPage() {
     dateOverride,
     isLoading: characterLoading,
     numericValues,
+    evolutionCode,
+    clearEvolutionCode,
     advanceDay,
-    checkAndEvolve,
     resetDate,
     rebornAsEgg,
     submitNumericValue,
@@ -80,7 +93,7 @@ export default function DashboardPage() {
 
   const effectiveToday = getCurrentDateString();
 
-  const { logs: recentLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated, cycleStartDate, effectiveToday);
+  const { logs: recentLogs, fullLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated, cycleStartDate, effectiveToday);
   const { journals, saveJournal, deleteJournal } = useJournal(effectiveToday);
 
   const { favoriteTaskIds, isFavorite, toggleFavorite } = useUserSettings();
@@ -99,6 +112,12 @@ export default function DashboardPage() {
     }
     return TASKS.filter((t) => t.category === activeTab);
   }, [activeTab, favoriteTaskIds]);
+
+  // Cumulative cycle scores
+  const cycleScores = useMemo<Scores>(() => {
+    const agg = buildAggregatesForDays(fullLogs as DailyLogLike[], cycleStartDate, cycleInfo.dayN);
+    return agg.earnedXp as Scores;
+  }, [fullLogs, cycleStartDate, cycleInfo.dayN]);
 
   useEffect(() => {
     if (authStatus === "unauthenticated") {
@@ -127,19 +146,18 @@ export default function DashboardPage() {
     load();
   }, [isAuthenticated, logsTrigger]);
 
-  function showEvolutionToast(newStage?: string, newMidType?: string, newFinalType?: string) {
-    if (!newStage) return;
-    const rawCode = newStage === "mid" ? newMidType : newStage === "final" ? newFinalType : newStage;
-    const char = getCharacterByCode(resolveCharacterCode(rawCode));
-    showToast(`進化した！ ${char?.emoji ?? ''} ${char?.nameJp ?? newStage} が生まれた！`);
-  }
+  // Show toast when evolution fires
+  useEffect(() => {
+    if (!evolutionCode) return;
+    const char = getCharacterByCode(resolveCharacterCode(evolutionCode.code));
+    showToast(`進化した！ ${char?.emoji ?? ''} ${char?.nameJp ?? evolutionCode.code} が生まれた！`);
+    clearEvolutionCode();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evolutionCode]);
 
   async function handleAdvanceDay() {
-    const result = await advanceDay();
+    await advanceDay();
     setLogsTrigger((n) => n + 1);
-    if (result.evolved) {
-      showEvolutionToast(result.newStage, result.midType, result.finalType);
-    }
   }
 
   async function handleResetDate() {
@@ -160,6 +178,8 @@ export default function DashboardPage() {
       const char = getCharacterByCode(resolveCharacterCode(result.recordedType));
       const recorded = char ? char.nameJp : result.recordedType;
       showToast(`図鑑に ${recorded} を登録しました`);
+    } else if (result.success) {
+      showToast(`卵に戻りました`);
     }
   }
 
@@ -173,10 +193,6 @@ export default function DashboardPage() {
     await submitNumericValue(taskId, value);
     setLogsTrigger((n) => n + 1);
     refetchRecentLogs();
-    const result = await checkAndEvolve();
-    if (result.evolved) {
-      showEvolutionToast(result.newStage, result.midType, result.finalType);
-    }
   }
 
   async function handleNumericClear(taskId: string) {
@@ -204,10 +220,6 @@ export default function DashboardPage() {
       }
     }
     refetchRecentLogs();
-    const result = await checkAndEvolve();
-    if (result.evolved) {
-      showEvolutionToast(result.newStage, result.midType, result.finalType);
-    }
   }
 
   async function handleJournalDelete(slot: 'morning' | 'evening') {
@@ -249,10 +261,6 @@ export default function DashboardPage() {
         return next;
       });
       refetchRecentLogs();
-      const result = await checkAndEvolve();
-      if (result.evolved) {
-        showEvolutionToast(result.newStage, result.midType, result.finalType);
-      }
     }
   }
 
@@ -268,6 +276,7 @@ export default function DashboardPage() {
 
   const checkedTaskIds = new Set(dailyLogs.map((log) => log.taskId));
   const scores = computeScores(dailyLogs);
+  const displayStage = characterLoading ? "egg" : phaseToDisplayStage(cycleInfo.phase);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -317,7 +326,7 @@ export default function DashboardPage() {
           <div className="flex flex-col items-center gap-1">
             <CharacterDisplay
               dayNumber={characterLoading ? 1 : dayNumber}
-              stage={characterLoading ? "egg" : stage}
+              stage={displayStage}
               midType={midType}
               finalType={finalType}
             />
@@ -366,7 +375,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-          <ScoreBars scores={scores} />
+          <ScoreBars scores={scores} cycleScores={cycleScores} />
         </div>
 
         {/* Tab bar */}

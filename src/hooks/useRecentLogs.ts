@@ -5,15 +5,19 @@ import { client } from '@/lib/amplifyClient';
 import type { DailyLogSummary } from '@/lib/constraints';
 import { getTodayString, addDays } from '@/lib/constraints';
 
+export interface RecentLogEntry extends DailyLogSummary {
+  numericValues?: Record<string, number>;
+}
+
 export function useRecentLogs(enabled: boolean = true, cycleStartDate?: string, today?: string) {
   const [logs, setLogs] = useState<DailyLogSummary[]>([]);
+  const [fullLogs, setFullLogs] = useState<RecentLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
       const effectiveToday = today ?? getTodayString();
-      // サイクル開始日から今日までを取得。未設定なら7日前をフォールバック
       const startDate = cycleStartDate ?? addDays(effectiveToday, -6);
 
       const { data } = await client.models.DailyLog.list({
@@ -22,21 +26,35 @@ export function useRecentLogs(enabled: boolean = true, cycleStartDate?: string, 
         },
       });
 
-      const byDate = new Map<string, string[]>();
+      const byDate = new Map<string, { completedTaskIds: string[]; numericValues: Record<string, number> }>();
       for (const log of data ?? []) {
-        const existing = byDate.get(log.date) ?? [];
-        existing.push(log.taskId);
+        const existing = byDate.get(log.date) ?? { completedTaskIds: [], numericValues: {} };
+        existing.completedTaskIds.push(log.taskId);
+        if (log.numericValues) {
+          try {
+            const nv = typeof log.numericValues === 'string'
+              ? JSON.parse(log.numericValues)
+              : log.numericValues;
+            if (nv && typeof nv === 'object' && !Array.isArray(nv)) {
+              for (const [k, v] of Object.entries(nv)) {
+                if (typeof v === 'number') existing.numericValues[k] = v;
+              }
+            }
+          } catch { /* skip malformed */ }
+        }
         byDate.set(log.date, existing);
       }
 
-      const summaries: DailyLogSummary[] = Array.from(byDate.entries()).map(
-        ([date, completedTaskIds]) => ({ date, completedTaskIds })
+      const entries: RecentLogEntry[] = Array.from(byDate.entries()).map(
+        ([date, { completedTaskIds, numericValues }]) => ({ date, completedTaskIds, numericValues })
       );
 
-      setLogs(summaries);
+      setLogs(entries.map(({ date, completedTaskIds }) => ({ date, completedTaskIds })));
+      setFullLogs(entries);
     } catch (e) {
       console.error('useRecentLogs fetch error:', e);
       setLogs([]);
+      setFullLogs([]);
     } finally {
       setLoading(false);
     }
@@ -47,5 +65,5 @@ export function useRecentLogs(enabled: boolean = true, cycleStartDate?: string, 
     fetchLogs();
   }, [enabled, fetchLogs]);
 
-  return { logs, loading, refetch: fetchLogs };
+  return { logs, fullLogs, loading, refetch: fetchLogs };
 }

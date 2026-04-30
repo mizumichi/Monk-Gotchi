@@ -64,9 +64,7 @@ export default function CharacterDisplay({ dayNumber, stage, midType, finalType 
       <p className="font-mono font-bold text-zinc-100 text-sm tracking-wide">
         {char.nameJp}
       </p>
-      <p className="font-mono text-xs text-violet-400 tracking-widest">
-        Day {dayNumber} / 7
-      </p>
+
     </div>
   );
 }
