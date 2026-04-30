@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
 import { client } from "@/lib/amplifyClient";
 import {
@@ -134,10 +134,7 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
   const cycleStartDate = character?.cycleStartDate ?? today;
   const dayNumber = calculateDayNumber(cycleStartDate);
   const stage = getStage(dayNumber);
-  const cycleInfo = useMemo(
-    () => getCycleInfo(character?.cycleStartDate),
-    [character?.cycleStartDate]
-  );
+  const cycleInfo = getCycleInfo(character?.cycleStartDate);
 
   // キャラの進化をDBに反映し、結果を返す内部ヘルパー
   const applyEvolution = useCallback(
