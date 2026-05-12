@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
 import CharacterDisplay from "@/components/CharacterDisplay";
+import CharacterStage from "@/components/CharacterStage";
 import ScoreBars from "@/components/ScoreBars";
 import TaskList from "@/components/TaskList";
 import { useCharacter } from "@/hooks/useCharacter";
@@ -87,6 +88,7 @@ export default function DashboardPage() {
     advanceDay,
     resetDate,
     rebornAsEgg,
+    purgeAllData,
     submitNumericValue,
     clearNumericValue,
   } = useCharacter(isAuthenticated);
@@ -132,10 +134,17 @@ export default function DashboardPage() {
       setLogsLoading(true);
       try {
         const today = getCurrentDateString();
-        const { data } = await client.models.DailyLog.list({
-          filter: { date: { eq: today } },
-        });
-        setDailyLogs(data ?? []);
+        const allData: DailyLog[] = [];
+        let nt: string | null | undefined;
+        do {
+          const res = await client.models.DailyLog.list({
+            filter: { date: { eq: today } },
+            ...(nt ? { nextToken: nt } : {}),
+          });
+          (res.data ?? []).forEach(d => allData.push(d));
+          nt = res.nextToken;
+        } while (nt);
+        setDailyLogs(allData);
       } catch (err) {
         console.error("DailyLog fetch error:", err);
       } finally {
@@ -158,6 +167,16 @@ export default function DashboardPage() {
   async function handleAdvanceDay() {
     await advanceDay();
     setLogsTrigger((n) => n + 1);
+  }
+
+  async function handlePurgeAllData() {
+    const ok = window.confirm('すべての記録とキャラを初期化します。この操作は取り消せません。よろしいですか？');
+    if (!ok) return;
+    setDailyLogs([]);
+    setEvolutionMessage(null);
+    await purgeAllData();
+    setLogsTrigger((n) => n + 1);
+    refetchRecentLogs();
   }
 
   async function handleResetDate() {
@@ -348,6 +367,13 @@ export default function DashboardPage() {
               >
                 リセット (テスト)
               </button>
+              <button
+                onClick={handlePurgeAllData}
+                disabled={characterLoading}
+                className="font-mono text-[10px] text-zinc-600 hover:text-red-400 border border-zinc-800 hover:border-red-700 px-2 py-0.5 transition-colors disabled:opacity-30"
+              >
+                全消去 (テスト)
+              </button>
             </div>
 
             {(cycleInfo.phase === 'final' || cycleInfo.isOverflow) && (
@@ -377,6 +403,9 @@ export default function DashboardPage() {
           </div>
           <ScoreBars scores={scores} cycleScores={cycleScores} />
         </div>
+
+        {/* Character Stage */}
+        <CharacterStage />
 
         {/* Tab bar */}
         <div className="flex overflow-x-auto border border-zinc-800 bg-zinc-900 scrollbar-none -mx-0">
