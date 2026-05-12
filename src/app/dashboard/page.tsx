@@ -10,6 +10,7 @@ import CharacterStage from "@/components/CharacterStage";
 import ScoreBars from "@/components/ScoreBars";
 import TaskList from "@/components/TaskList";
 import { useCharacter } from "@/hooks/useCharacter";
+import { useCharacterAnimation } from "@/hooks/useCharacterAnimation";
 import { useJournal } from "@/hooks/useJournal";
 import { useRecentLogs } from "@/hooks/useRecentLogs";
 import { useUserSettings } from "@/hooks/useUserSettings";
@@ -92,6 +93,8 @@ export default function DashboardPage() {
     submitNumericValue,
     clearNumericValue,
   } = useCharacter(isAuthenticated);
+
+  const { bouncing, effectTrigger, triggerReaction } = useCharacterAnimation();
 
   const effectiveToday = getCurrentDateString();
 
@@ -209,6 +212,7 @@ export default function DashboardPage() {
   }
 
   async function handleNumericSubmit(taskId: string, value: number) {
+    triggerReaction();
     await submitNumericValue(taskId, value);
     setLogsTrigger((n) => n + 1);
     refetchRecentLogs();
@@ -260,6 +264,7 @@ export default function DashboardPage() {
         await client.models.DailyLog.delete({ id: existing.id });
         setDailyLogs((prev) => prev.filter((log) => log.id !== existing.id));
       } else {
+        triggerReaction();
         const { userId } = await getCurrentUser();
         const today = getCurrentDateString();
         const { data } = await client.models.DailyLog.create({
@@ -405,7 +410,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Character Stage */}
-        <CharacterStage />
+        <CharacterStage bouncing={bouncing} effectTrigger={effectTrigger} />
 
         {/* Tab bar */}
         <div className="flex overflow-x-auto border border-zinc-800 bg-zinc-900 scrollbar-none -mx-0">
