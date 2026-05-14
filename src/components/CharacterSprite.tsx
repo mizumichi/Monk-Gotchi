@@ -1,8 +1,16 @@
 'use client';
 
 import MonkEgg from './sprites/MonkEgg';
+import WalkingCharacter from './sprites/WalkingCharacter';
+import { MONK_BABY, DARAKU_MONK, SLOTHCHI_KING } from './sprites/sprite-data';
 
-type CharacterCode = 'Monk-Egg';
+export type CharacterCode = 'Monk-Egg' | 'Monk-Baby' | 'Daraku-Monk' | 'Slothchi-King';
+
+type Props = {
+  code: CharacterCode;
+  bouncing?: boolean;
+  stageWidth: number;
+};
 
 function FallbackSprite() {
   return (
@@ -22,7 +30,17 @@ function FallbackSprite() {
   );
 }
 
-export default function CharacterSprite({ code }: { code: CharacterCode }) {
-  if (code === 'Monk-Egg') return <MonkEgg />;
-  return <FallbackSprite />;
+export default function CharacterSprite({ code, bouncing, stageWidth }: Props) {
+  switch (code) {
+    case 'Monk-Egg':
+      return <MonkEgg />;
+    case 'Monk-Baby':
+      return <WalkingCharacter data={MONK_BABY} stageWidth={stageWidth} bouncing={bouncing} />;
+    case 'Daraku-Monk':
+      return <WalkingCharacter data={DARAKU_MONK} stageWidth={stageWidth} bouncing={bouncing} />;
+    case 'Slothchi-King':
+      return <WalkingCharacter data={SLOTHCHI_KING} stageWidth={stageWidth} bouncing={bouncing} />;
+    default:
+      return <FallbackSprite />;
+  }
 }
