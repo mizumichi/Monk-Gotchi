@@ -410,7 +410,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Character Stage */}
-        <CharacterStage bouncing={bouncing} effectTrigger={effectTrigger} stage={stage} midType={midType} finalType={finalType} />
+        <CharacterStage bouncing={bouncing} effectTrigger={effectTrigger} stage={stage} midType={midType} finalType={finalType} isLoading={characterLoading} />
 
         {/* Tab bar */}
         <div className="flex overflow-x-auto border border-zinc-800 bg-zinc-900 scrollbar-none -mx-0">
