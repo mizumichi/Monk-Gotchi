@@ -45,7 +45,7 @@ const CATEGORIES: Category[] = ['strength', 'sleep', 'nutrition', 'environment',
 
 // 44パターンのシミュレーションで確定した7日間の MaxPossible
 const MAX_POSSIBLE_7DAY: Record<Category, number> = {
-  strength:    1021,
+  strength:     800,
   sleep:        918,
   nutrition:    995,
   environment:  377,
@@ -253,6 +253,23 @@ export function evolveFinal(logs: DailyLogLike[], cycleStartDate: string): Final
   }
   // 3d. デフォルト
   return humorous('Slothchi-King');
+}
+
+// ── 木の育成ランク判定 ────────────────────────────────────────────────────────
+
+export type TreeRank = 'low' | 'mid' | 'high';
+
+export interface TreeResult {
+  rank: TreeRank;
+  fruitCount: number;
+}
+
+// score = 現在サイクルの累計XP
+export function getTreeRank(score: number): TreeResult {
+  if (score < 350) return { rank: 'low',  fruitCount: 1 };
+  if (score < 700) return { rank: 'mid',  fruitCount: 3 };
+  const f = Math.min(12, Math.round(6 + ((score - 700) / 350) * 6));
+  return { rank: 'high', fruitCount: f };
 }
 
 // ── 互換ラッパー(D-4 で置き換える) ─────────────────────────────────────────

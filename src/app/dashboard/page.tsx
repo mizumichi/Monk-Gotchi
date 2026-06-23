@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
-import CharacterDisplay from "@/components/CharacterDisplay";
 import CharacterStage from "@/components/CharacterStage";
+import TreeDisplay from "@/components/TreeDisplay";
 import ScoreBars from "@/components/ScoreBars";
 import TaskList from "@/components/TaskList";
 import { useCharacter } from "@/hooks/useCharacter";
@@ -123,6 +123,11 @@ export default function DashboardPage() {
     const agg = buildAggregatesForDays(fullLogs as DailyLogLike[], cycleStartDate, cycleInfo.dayN);
     return agg.earnedXp as Scores;
   }, [fullLogs, cycleStartDate, cycleInfo.dayN]);
+
+  const totalCycleScore = useMemo(
+    () => Object.values(cycleScores).reduce((sum, v) => sum + v, 0),
+    [cycleScores],
+  );
 
   useEffect(() => {
     if (authStatus === "unauthenticated") {
@@ -348,12 +353,7 @@ export default function DashboardPage() {
         {/* Character + Score */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex flex-col items-center gap-1">
-            <CharacterDisplay
-              dayNumber={characterLoading ? 1 : dayNumber}
-              stage={displayStage}
-              midType={midType}
-              finalType={finalType}
-            />
+            <TreeDisplay score={totalCycleScore} />
             <p className="font-mono text-xs text-zinc-400 tracking-wider">
               {formatDayLabel(cycleInfo)}
             </p>
