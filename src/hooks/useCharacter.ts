@@ -11,12 +11,13 @@ import {
 import { getCycleInfo, type CycleInfo } from "@/lib/cycle";
 import { calcSleepHoursXp } from "@/lib/sleepXp";
 import { getTaskById } from "@/data/tasks";
+import { getTreeRank } from "@/lib/evolution";
 import type { Schema } from "../../amplify/data/resource";
 
 type Character = Schema["Character"]["type"];
 type AmplifyDailyLog = Schema["DailyLog"]["type"];
 
-export interface RebornResult {
+export interface HarvestResult {
   success: boolean;
 }
 
@@ -30,7 +31,7 @@ export interface UseCharacterResult {
   refetch: () => Promise<void>;
   advanceDay: () => Promise<void>;
   resetDate: () => Promise<void>;
-  rebornAsEgg: () => Promise<RebornResult>;
+  harvest: (totalScore: number) => Promise<HarvestResult>;
   submitNumericValue: (taskId: string, value: number) => Promise<void>;
   clearNumericValue: (taskId: string) => Promise<void>;
   purgeAllData: () => Promise<void>;
@@ -64,8 +65,6 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
         const { data: created, errors: createErrors } = await client.models.Character.create({
           userId,
           cycleStartDate: today,
-          stage: "egg",
-          categoryScores: JSON.stringify({}),
         });
         console.log("[useCharacter] create result:", created, "errors:", JSON.stringify(createErrors, null, 2));
         if (created) setCharacter(created);
@@ -156,10 +155,6 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
       const { data: updated } = await client.models.Character.update({
         id: character.id,
         cycleStartDate: today,
-        stage: 'egg',
-        midType: null,
-        finalType: null,
-        categoryScores: '{}',
       });
       if (updated) setCharacter(updated);
       setNumericValues({});
@@ -180,9 +175,6 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
       const { data: updated } = await client.models.Character.update({
         id: character.id,
         cycleStartDate: today,
-        stage: "egg",
-        midType: null,
-        finalType: null,
       });
       if (updated) setCharacter(updated);
     } catch (err) {
@@ -190,25 +182,33 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
     }
   }, [character]);
 
-  const rebornAsEgg = useCallback(async (): Promise<RebornResult> => {
+  const harvest = useCallback(async (totalScore: number): Promise<HarvestResult> => {
     if (!character) return { success: false };
     try {
+      const { rank, fruitCount } = getTreeRank(totalScore);
+      const harvestedAt = new Date().toISOString();
+      const today = getRealCurrentDateString();
+
+      await client.models.Harvest.create({
+        harvestedAt,
+        cycleStartDate: character.cycleStartDate,
+        totalScore,
+        rank,
+        fruitCount,
+      });
+
       setDateOverride(null);
       setDateOverrideState(null);
 
-      const today = getRealCurrentDateString();
       const { data: updated } = await client.models.Character.update({
         id: character.id,
         cycleStartDate: today,
-        stage: "egg",
-        midType: null,
-        finalType: null,
       });
       if (updated) setCharacter(updated);
 
       return { success: true };
     } catch (err) {
-      console.error("[rebornAsEgg] error:", err);
+      console.error("[harvest] error:", err);
       return { success: false };
     }
   }, [character]);
@@ -281,7 +281,7 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
     refetch: fetchOrCreate,
     advanceDay,
     resetDate,
-    rebornAsEgg,
+    harvest,
     submitNumericValue,
     clearNumericValue,
     purgeAllData,

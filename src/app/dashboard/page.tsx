@@ -49,7 +49,7 @@ export default function DashboardPage() {
     numericValues,
     advanceDay,
     resetDate,
-    rebornAsEgg,
+    harvest,
     purgeAllData,
     submitNumericValue,
     clearNumericValue,
@@ -144,14 +144,17 @@ export default function DashboardPage() {
     setLogsTrigger((n) => n + 1);
   }
 
-  async function handleReborn() {
-    const ok = window.confirm('新サイクルを開始します。よろしいですか？');
+  async function handleHarvest() {
+    const ok = window.confirm('今サイクルを収穫して、新サイクルを始めますか？');
     if (!ok) return;
 
     setDailyLogs([]);
-    const result = await rebornAsEgg();
+    const result = await harvest(totalCycleScore);
     setLogsTrigger((n) => n + 1);
-    if (result.success) showToast('新サイクルを開始しました');
+    if (result.success) {
+      showToast('収穫しました！');
+      refetchRecentLogs();
+    }
   }
 
   function showToast(message: string) {
@@ -258,10 +261,10 @@ export default function DashboardPage() {
         </span>
         <div className="flex items-center gap-2">
           <Link
-            href="/dex"
+            href="/orchard"
             className="font-mono text-xs text-zinc-400 hover:text-violet-300 border border-zinc-700 hover:border-violet-600 px-3 py-1.5 transition-colors"
           >
-            📖 図鑑
+            🌳 果樹園
           </Link>
           <button
             onClick={signOut}
@@ -341,25 +344,17 @@ export default function DashboardPage() {
 
           {(cycleInfo.phase === 'final' || cycleInfo.isOverflow) && (
             <div className="flex flex-col items-center gap-1 mt-1 w-full">
-              {cycleInfo.isOverflow ? (
+              {cycleInfo.isOverflow && (
                 <p className="font-mono text-[10px] text-amber-400">
-                  休憩中・新サイクル開始待ち
-                </p>
-              ) : (
-                <p className="font-mono text-[10px] text-zinc-500">
-                  今日は休憩日です
+                  収穫期を過ぎています
                 </p>
               )}
               <button
-                onClick={handleReborn}
+                onClick={handleHarvest}
                 disabled={characterLoading}
-                className={`font-mono text-sm border-2 px-4 py-2 transition-colors disabled:opacity-30 w-full ${
-                  cycleInfo.isOverflow
-                    ? 'text-amber-300 hover:text-white border-amber-600 hover:border-amber-400 hover:bg-amber-900/30'
-                    : 'text-violet-300 hover:text-white border-violet-600 hover:border-violet-400 hover:bg-violet-900/30'
-                }`}
+                className="font-mono text-sm border-2 px-4 py-2 transition-colors disabled:opacity-30 w-full text-emerald-300 hover:text-white border-emerald-600 hover:border-emerald-400 hover:bg-emerald-900/30"
               >
-                🥚 もう一度育てる
+                🍎 収穫する
               </button>
             </div>
           )}

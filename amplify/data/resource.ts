@@ -24,19 +24,16 @@ const schema = a.schema({
     .model({
       userId: a.string().required(),
       cycleStartDate: a.date().required(),
-      stage: a.string().required(),
-      midType: a.string(),
-      finalType: a.string(),
-      categoryScores: a.json().required(),
     })
     .authorization((allow) => [allow.owner()]),
 
-  CharacterDex: a
+  Harvest: a
     .model({
-      characterType: a.string().required(),
-      firstObtainedAt: a.datetime().required(),
-      lastObtainedAt: a.datetime().required(),
-      obtainedCount: a.integer().required().default(1),
+      harvestedAt: a.datetime().required(),
+      cycleStartDate: a.string().required(),
+      totalScore: a.integer().required(),
+      rank: a.string().required(),
+      fruitCount: a.integer().required(),
     })
     .authorization((allow) => [allow.owner()]),
 
