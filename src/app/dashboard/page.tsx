@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
-import CharacterStage from "@/components/CharacterStage";
 import TreeDisplay from "@/components/TreeDisplay";
-import ScoreBars from "@/components/ScoreBars";
 import TaskList from "@/components/TaskList";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useCharacterAnimation } from "@/hooks/useCharacterAnimation";
@@ -17,11 +15,9 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
 import { getCharacterByCode, resolveCharacterCode } from "@/data/characters";
-import { formatDayLabel, type CyclePhase } from "@/lib/cycle";
+import { formatDayLabel } from "@/lib/cycle";
 import { buildAggregatesForDays, type DailyLogLike } from "@/lib/evolution";
-import { TASKS, calcCategoryScores, type Category, type Task, getTaskById } from "@/data/tasks";
-import { calcSleepHoursXp } from "@/lib/sleepXp";
-import type { Stage } from "@/lib/date";
+import { TASKS, type Category, type Task } from "@/data/tasks";
 import type { Schema } from "../../../amplify/data/resource";
 
 type DailyLog = Schema["DailyLog"]["type"];
@@ -38,34 +34,6 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: 'mental',      label: '精神',       icon: '🧘' },
 ];
 
-function phaseToDisplayStage(phase: CyclePhase): Stage {
-  if (phase === 'egg') return 'egg';
-  if (phase === 'baby') return 'early';
-  if (phase === 'mid') return 'mid';
-  return 'final';
-}
-
-function computeScores(logs: DailyLog[]): Scores {
-  const numericValues: Record<string, number> = {};
-  for (const log of logs) {
-    if (log.numericValues) {
-      try {
-        const nv = typeof log.numericValues === 'string'
-          ? JSON.parse(log.numericValues)
-          : log.numericValues;
-        if (nv && typeof nv[log.taskId] === 'number') {
-          const task = getTaskById(log.taskId);
-          const ratio = calcSleepHoursXp(nv[log.taskId]);
-          numericValues[`${log.taskId}_main`] = Math.round((task?.mainXp ?? 40) * ratio);
-          if (task?.subXp != null) {
-            numericValues[`${log.taskId}_sub`] = Math.round(task.subXp * ratio);
-          }
-        }
-      } catch { /* skip */ }
-    }
-  }
-  return calcCategoryScores(logs.map((l) => l.taskId), numericValues);
-}
 
 export default function DashboardPage() {
   const { signOut, authStatus } = useAuthenticator((context) => [
@@ -75,11 +43,7 @@ export default function DashboardPage() {
   const isAuthenticated = authStatus === "authenticated";
 
   const {
-    dayNumber,
-    stage,
     cycleInfo,
-    midType,
-    finalType,
     cycleStartDate,
     dateOverride,
     isLoading: characterLoading,
@@ -94,7 +58,7 @@ export default function DashboardPage() {
     clearNumericValue,
   } = useCharacter(isAuthenticated);
 
-  const { bouncing, effectTrigger, triggerReaction } = useCharacterAnimation();
+  const { triggerReaction } = useCharacterAnimation();
 
   const effectiveToday = getCurrentDateString();
 
@@ -304,8 +268,6 @@ export default function DashboardPage() {
   }
 
   const checkedTaskIds = new Set(dailyLogs.map((log) => log.taskId));
-  const scores = computeScores(dailyLogs);
-  const displayStage = characterLoading ? "egg" : phaseToDisplayStage(cycleInfo.phase);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -350,67 +312,61 @@ export default function DashboardPage() {
 
       {/* Main content */}
       <main className="max-w-lg mx-auto px-4 py-5 flex flex-col gap-5">
-        {/* Character + Score */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex flex-col items-center gap-1">
-            <TreeDisplay score={totalCycleScore} />
-            <p className="font-mono text-xs text-zinc-400 tracking-wider">
-              {formatDayLabel(cycleInfo)}
-            </p>
-            <div className="flex gap-1">
+        {/* Tree */}
+        <div className="flex flex-col items-center gap-1">
+          <TreeDisplay score={totalCycleScore} />
+          <p className="font-mono text-xs text-zinc-400 tracking-wider">
+            {formatDayLabel(cycleInfo)}
+          </p>
+          <div className="flex gap-1">
+            <button
+              onClick={handleAdvanceDay}
+              disabled={characterLoading}
+              className="font-mono text-[10px] text-zinc-600 hover:text-zinc-400 border border-zinc-800 hover:border-zinc-600 px-2 py-0.5 transition-colors disabled:opacity-30"
+            >
+              ＋1日 (テスト)
+            </button>
+            <button
+              onClick={handleResetDate}
+              disabled={characterLoading}
+              className="font-mono text-[10px] text-zinc-600 hover:text-amber-400 border border-zinc-800 hover:border-amber-700 px-2 py-0.5 transition-colors disabled:opacity-30"
+            >
+              リセット (テスト)
+            </button>
+            <button
+              onClick={handlePurgeAllData}
+              disabled={characterLoading}
+              className="font-mono text-[10px] text-zinc-600 hover:text-red-400 border border-zinc-800 hover:border-red-700 px-2 py-0.5 transition-colors disabled:opacity-30"
+            >
+              全消去 (テスト)
+            </button>
+          </div>
+
+          {(cycleInfo.phase === 'final' || cycleInfo.isOverflow) && (
+            <div className="flex flex-col items-center gap-1 mt-1 w-full">
+              {cycleInfo.isOverflow ? (
+                <p className="font-mono text-[10px] text-amber-400">
+                  休憩中・新サイクル開始待ち
+                </p>
+              ) : (
+                <p className="font-mono text-[10px] text-zinc-500">
+                  今日は休憩日です
+                </p>
+              )}
               <button
-                onClick={handleAdvanceDay}
+                onClick={handleReborn}
                 disabled={characterLoading}
-                className="font-mono text-[10px] text-zinc-600 hover:text-zinc-400 border border-zinc-800 hover:border-zinc-600 px-2 py-0.5 transition-colors disabled:opacity-30"
+                className={`font-mono text-sm border-2 px-4 py-2 transition-colors disabled:opacity-30 w-full ${
+                  cycleInfo.isOverflow
+                    ? 'text-amber-300 hover:text-white border-amber-600 hover:border-amber-400 hover:bg-amber-900/30'
+                    : 'text-violet-300 hover:text-white border-violet-600 hover:border-violet-400 hover:bg-violet-900/30'
+                }`}
               >
-                ＋1日 (テスト)
-              </button>
-              <button
-                onClick={handleResetDate}
-                disabled={characterLoading}
-                className="font-mono text-[10px] text-zinc-600 hover:text-amber-400 border border-zinc-800 hover:border-amber-700 px-2 py-0.5 transition-colors disabled:opacity-30"
-              >
-                リセット (テスト)
-              </button>
-              <button
-                onClick={handlePurgeAllData}
-                disabled={characterLoading}
-                className="font-mono text-[10px] text-zinc-600 hover:text-red-400 border border-zinc-800 hover:border-red-700 px-2 py-0.5 transition-colors disabled:opacity-30"
-              >
-                全消去 (テスト)
+                🥚 もう一度育てる
               </button>
             </div>
-
-            {(cycleInfo.phase === 'final' || cycleInfo.isOverflow) && (
-              <div className="flex flex-col items-center gap-1 mt-1 w-full">
-                {cycleInfo.isOverflow ? (
-                  <p className="font-mono text-[10px] text-amber-400">
-                    休憩中・新サイクル開始待ち
-                  </p>
-                ) : (
-                  <p className="font-mono text-[10px] text-zinc-500">
-                    今日は休憩日です
-                  </p>
-                )}
-                <button
-                  onClick={handleReborn}
-                  disabled={characterLoading}
-                  className={`font-mono text-sm border-2 px-4 py-2 transition-colors disabled:opacity-30 w-full ${
-                    cycleInfo.isOverflow
-                      ? 'text-amber-300 hover:text-white border-amber-600 hover:border-amber-400 hover:bg-amber-900/30'
-                      : 'text-violet-300 hover:text-white border-violet-600 hover:border-violet-400 hover:bg-violet-900/30'
-                  }`}
-                >
-                  🥚 もう一度育てる
-                </button>
-              </div>
-            )}
-          </div>
-          <ScoreBars scores={scores} cycleScores={cycleScores} />
+          )}
         </div>
-
-        {/* Character Stage */}
-        <CharacterStage bouncing={bouncing} effectTrigger={effectTrigger} stage={stage} midType={midType} finalType={finalType} isLoading={characterLoading} />
 
         {/* Tab bar */}
         <div className="flex overflow-x-auto border border-zinc-800 bg-zinc-900 scrollbar-none -mx-0">
