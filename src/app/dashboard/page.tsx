@@ -14,9 +14,8 @@ import { useRecentLogs } from "@/hooks/useRecentLogs";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
-import { getCharacterByCode, resolveCharacterCode } from "@/data/characters";
 import { formatDayLabel } from "@/lib/cycle";
-import { buildAggregatesForDays, type DailyLogLike } from "@/lib/evolution";
+import { buildAggregatesForDays, getTreeRank, type DailyLogLike } from "@/lib/evolution";
 import { TASKS, type Category, type Task } from "@/data/tasks";
 import type { Schema } from "../../../amplify/data/resource";
 
@@ -48,8 +47,6 @@ export default function DashboardPage() {
     dateOverride,
     isLoading: characterLoading,
     numericValues,
-    evolutionCode,
-    clearEvolutionCode,
     advanceDay,
     resetDate,
     rebornAsEgg,
@@ -72,7 +69,7 @@ export default function DashboardPage() {
   const [logsLoading, setLogsLoading] = useState(true);
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
   const [logsTrigger, setLogsTrigger] = useState(0);
-  const [evolutionMessage, setEvolutionMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const filteredTasks = useMemo(() => {
@@ -127,15 +124,6 @@ export default function DashboardPage() {
     load();
   }, [isAuthenticated, logsTrigger]);
 
-  // Show toast when evolution fires
-  useEffect(() => {
-    if (!evolutionCode) return;
-    const char = getCharacterByCode(resolveCharacterCode(evolutionCode.code));
-    showToast(`進化した！ ${char?.emoji ?? ''} ${char?.nameJp ?? evolutionCode.code} が生まれた！`);
-    clearEvolutionCode();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evolutionCode]);
-
   async function handleAdvanceDay() {
     await advanceDay();
     setLogsTrigger((n) => n + 1);
@@ -145,7 +133,6 @@ export default function DashboardPage() {
     const ok = window.confirm('すべての記録とキャラを初期化します。この操作は取り消せません。よろしいですか？');
     if (!ok) return;
     setDailyLogs([]);
-    setEvolutionMessage(null);
     await purgeAllData();
     setLogsTrigger((n) => n + 1);
     refetchRecentLogs();
@@ -155,29 +142,22 @@ export default function DashboardPage() {
     setDailyLogs([]);
     await resetDate();
     setLogsTrigger((n) => n + 1);
-    setEvolutionMessage(null);
   }
 
   async function handleReborn() {
-    const ok = window.confirm(`現在のキャラを図鑑に登録して、卵から育て直しますか？`);
+    const ok = window.confirm('新サイクルを開始します。よろしいですか？');
     if (!ok) return;
 
     setDailyLogs([]);
     const result = await rebornAsEgg();
     setLogsTrigger((n) => n + 1);
-    if (result.success && result.recordedType) {
-      const char = getCharacterByCode(resolveCharacterCode(result.recordedType));
-      const recorded = char ? char.nameJp : result.recordedType;
-      showToast(`図鑑に ${recorded} を登録しました`);
-    } else if (result.success) {
-      showToast(`卵に戻りました`);
-    }
+    if (result.success) showToast('新サイクルを開始しました');
   }
 
   function showToast(message: string) {
-    setEvolutionMessage(message);
+    setToastMessage(message);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setEvolutionMessage(null), 3000);
+    toastTimer.current = setTimeout(() => setToastMessage(null), 3000);
   }
 
   async function handleNumericSubmit(taskId: string, value: number) {
@@ -301,11 +281,11 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Evolution toast */}
-      {evolutionMessage && (
+      {/* Toast */}
+      {toastMessage && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-violet-700 border border-violet-400 px-5 py-2.5 shadow-lg animate-fade-in">
           <p className="font-mono text-sm text-white tracking-wide whitespace-nowrap">
-            {evolutionMessage}
+            {toastMessage}
           </p>
         </div>
       )}
@@ -315,6 +295,23 @@ export default function DashboardPage() {
         {/* Tree */}
         <div className="flex flex-col items-center gap-1">
           <TreeDisplay score={totalCycleScore} />
+          {/* Rank info */}
+          {(() => {
+            const { rank, fruitCount } = getTreeRank(totalCycleScore);
+            const rankLabel = rank === 'low' ? 'いまいち' : rank === 'mid' ? '普通' : 'だいぶ良い';
+            const rankColor = rank === 'low' ? 'text-zinc-400' : rank === 'mid' ? 'text-violet-300' : 'text-emerald-400';
+            const daysLeft = Math.max(0, 7 - cycleInfo.dayN);
+            return (
+              <div className="flex items-center gap-3 font-mono text-xs">
+                <span className="text-zinc-500">{totalCycleScore}pt</span>
+                <span className={rankColor}>{rankLabel}</span>
+                <span className="text-zinc-400">🍎 {fruitCount}個</span>
+                {daysLeft > 0 && (
+                  <span className="text-zinc-600">あと{daysLeft}日</span>
+                )}
+              </div>
+            );
+          })()}
           <p className="font-mono text-xs text-zinc-400 tracking-wider">
             {formatDayLabel(cycleInfo)}
           </p>
