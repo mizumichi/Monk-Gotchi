@@ -2,10 +2,18 @@
 
 import { useEffect, useRef } from "react";
 import { getTreeRank } from "@/lib/evolution";
+import type { FruitType } from "@/hooks/useCharacter";
+
+const FRUIT_COLORS: Record<FruitType, string> = {
+  apple: '#E24B4A',
+  peach: '#FF8C69',
+  mikan: '#FF8C00',
+};
 
 interface Props {
   score: number;
   fruitCount?: number;
+  fruitType?: FruitType;
   animating?: boolean;
   onAnimationComplete?: () => void;
 }
@@ -33,7 +41,7 @@ function lerp(a: number, b: number, t: number) {
 const CX = 160;
 const GROUND = 300;
 
-export default function TreeDisplay({ score, fruitCount, animating = false, onAnimationComplete }: Props) {
+export default function TreeDisplay({ score, fruitCount, fruitType = 'apple', animating = false, onAnimationComplete }: Props) {
   const t = clamp(score / 1050, 0, 1);
 
   const trunkH  = lerp(38, 150, t);
@@ -142,7 +150,7 @@ export default function TreeDisplay({ score, fruitCount, animating = false, onAn
             cx={fxPos}
             cy={fyPos}
             r={fruitR}
-            fill="#E24B4A"
+            fill={FRUIT_COLORS[fruitType]}
             style={animating ? ({
               transformBox: 'fill-box',
               transformOrigin: 'center bottom',

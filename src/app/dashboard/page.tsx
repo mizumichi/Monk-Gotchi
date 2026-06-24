@@ -46,6 +46,7 @@ export default function DashboardPage() {
     dateOverride,
     isLoading: characterLoading,
     numericValues,
+    fruitType,
     advanceDay,
     resetDate,
     harvest,
@@ -314,6 +315,7 @@ export default function DashboardPage() {
         <div className="flex flex-col items-center gap-1">
           <TreeDisplay
             score={totalCycleScore}
+            fruitType={fruitType}
             animating={harvestAnimating}
             onAnimationComplete={handleHarvestAnimationComplete}
           />
