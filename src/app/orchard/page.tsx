@@ -5,21 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { client } from "@/lib/amplifyClient";
+import CrateDisplay from "@/components/CrateDisplay";
 import type { Schema } from "../../../amplify/data/resource";
 
 type HarvestEntry = Schema["Harvest"]["type"];
 
-const RANK_LABELS: Record<string, string> = {
-  low:  'いまいち',
-  mid:  '普通',
-  high: 'だいぶ良い',
-};
-
-const RANK_COLORS: Record<string, string> = {
-  low:  'text-zinc-400',
-  mid:  'text-violet-300',
-  high: 'text-emerald-400',
-};
+function formatHarvestedAt(iso: string): string {
+  const d = new Date(iso);
+  const jst = new Date(d.getTime() + 9 * 3600 * 1000);
+  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`;
+}
 
 export default function OrchardPage() {
   const { authStatus } = useAuthenticator((context) => [context.authStatus]);
@@ -69,60 +64,54 @@ export default function OrchardPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 flex flex-col gap-5">
-        {/* Total fruits */}
-        <div className="flex flex-col items-center gap-1 py-6 border border-zinc-800 bg-zinc-900">
-          <p className="font-mono text-[10px] text-zinc-500 tracking-widest">合計実数</p>
-          <p className="font-mono text-6xl font-bold text-emerald-400">{totalFruits}</p>
-          <p className="font-mono text-sm text-zinc-400 mt-1">🍎 個</p>
+        {/* Summary */}
+        <div className="flex gap-6 justify-center py-4 border border-zinc-800 bg-zinc-900">
+          <div className="text-center">
+            <p className="font-mono text-[10px] text-zinc-500 tracking-widest">果樹園の実</p>
+            <p className="font-mono text-3xl font-bold text-emerald-400">{totalFruits}</p>
+            <p className="font-mono text-[10px] text-zinc-400">個</p>
+          </div>
+          <div className="w-px bg-zinc-800" />
+          <div className="text-center">
+            <p className="font-mono text-[10px] text-zinc-500 tracking-widest">収穫回数</p>
+            <p className="font-mono text-3xl font-bold text-violet-400">{harvests.length}</p>
+            <p className="font-mono text-[10px] text-zinc-400">回</p>
+          </div>
         </div>
 
-        {/* Harvest history */}
-        <section>
-          <p className="font-mono text-[10px] text-zinc-500 tracking-widest mb-2 border-b border-zinc-800 pb-1">
-            収穫履歴
+        {/* Card grid */}
+        {loading ? (
+          <p className="font-mono text-xs text-zinc-500 animate-pulse py-6 text-center tracking-widest">
+            LOADING...
           </p>
-          {loading ? (
-            <p className="font-mono text-xs text-zinc-500 animate-pulse py-6 text-center tracking-widest">
-              LOADING...
-            </p>
-          ) : harvests.length === 0 ? (
-            <p className="font-mono text-xs text-zinc-600 py-6 text-center">
-              まだ収穫がありません
-            </p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {harvests.map((h) => {
-                const rank = (h.rank ?? 'low') as keyof typeof RANK_LABELS;
-                const startDate = h.cycleStartDate ?? '';
-                const endDate = h.harvestedAt?.slice(0, 10) ?? '';
-                return (
-                  <div
-                    key={h.id}
-                    className="border border-zinc-800 bg-zinc-900 px-3 py-2.5 flex items-center justify-between"
-                  >
-                    <div className="flex flex-col gap-0.5">
-                      <p className="font-mono text-[10px] text-zinc-500">
-                        {startDate} 〜 {endDate}
-                      </p>
-                      <p className={`font-mono text-xs ${RANK_COLORS[rank] ?? 'text-zinc-400'}`}>
-                        {RANK_LABELS[rank] ?? rank}
-                      </p>
-                      <p className="font-mono text-[10px] text-zinc-600">
-                        累計 {h.totalScore ?? 0}pt
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-lg font-bold text-zinc-200">
-                        {h.fruitCount}
-                      </span>
-                      <span className="text-lg">🍎</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        ) : harvests.length === 0 ? (
+          <p className="font-mono text-xs text-zinc-600 py-6 text-center">
+            まだ収穫がありません
+          </p>
+        ) : (
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}
+          >
+            {harvests.map((h) => (
+              <div
+                key={h.id}
+                className="border border-zinc-800 bg-zinc-900 p-2 flex flex-col items-center"
+              >
+                <CrateDisplay fruitCount={h.fruitCount ?? 0} />
+                <p className="font-mono text-xs text-zinc-200 mt-1">
+                  {formatHarvestedAt(h.harvestedAt ?? '')}
+                </p>
+                <p className="font-mono text-[10px] text-zinc-500">
+                  {h.totalScore ?? 0} pt
+                </p>
+                <p className="font-mono text-[10px] text-zinc-400">
+                  🍎 {h.fruitCount} 個
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
