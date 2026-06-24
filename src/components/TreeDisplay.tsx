@@ -4,10 +4,10 @@ import { useEffect, useRef } from "react";
 import { getTreeRank } from "@/lib/evolution";
 import type { FruitType } from "@/hooks/useCharacter";
 
-const FRUIT_COLORS: Record<FruitType, string> = {
-  apple: '#E24B4A',
-  peach: '#FF8C69',
-  mikan: '#FF8C00',
+const FRUIT_EMOJI: Record<FruitType, string> = {
+  apple: '🍎',
+  peach: '🍑',
+  mikan: '🍊',
 };
 
 interface Props {
@@ -145,12 +145,13 @@ export default function TreeDisplay({ score, fruitCount, fruitType = 'apple', an
         const fyPos = crownCY + fy * crownR;
         const dropSvg = Math.round((GROUND - fruitR * 0.4) - fyPos);
         return (
-          <circle
+          <text
             key={`fr${i}`}
-            cx={fxPos}
-            cy={fyPos}
-            r={fruitR}
-            fill={FRUIT_COLORS[fruitType]}
+            x={fxPos}
+            y={fyPos}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={fruitR * 2}
             style={animating ? ({
               transformBox: 'fill-box',
               transformOrigin: 'center bottom',
@@ -158,7 +159,9 @@ export default function TreeDisplay({ score, fruitCount, fruitType = 'apple', an
               animation: 'fruitDrop 0.8s ease-in both',
               animationDelay: `${0.5 + i * 0.09}s`,
             } as React.CSSProperties) : undefined}
-          />
+          >
+            {FRUIT_EMOJI[fruitType]}
+          </text>
         );
       })}
 
