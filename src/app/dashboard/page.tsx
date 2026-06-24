@@ -71,6 +71,8 @@ export default function DashboardPage() {
   const [logsTrigger, setLogsTrigger] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [harvestAnimating, setHarvestAnimating] = useState(false);
+  const harvestScoreRef = useRef(0);
 
   const filteredTasks = useMemo(() => {
     if (activeTab === 'routine') {
@@ -147,9 +149,14 @@ export default function DashboardPage() {
   async function handleHarvest() {
     const ok = window.confirm('今サイクルを収穫して、新サイクルを始めますか？');
     if (!ok) return;
+    harvestScoreRef.current = totalCycleScore;
+    setHarvestAnimating(true);
+  }
 
+  async function handleHarvestAnimationComplete() {
+    setHarvestAnimating(false);
     setDailyLogs([]);
-    const result = await harvest(totalCycleScore);
+    const result = await harvest(harvestScoreRef.current);
     setLogsTrigger((n) => n + 1);
     if (result.success) {
       showToast('収穫しました！');
@@ -284,6 +291,19 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Click-blocking overlay during harvest animation */}
+      {harvestAnimating && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 40,
+            cursor: 'wait',
+            pointerEvents: 'all',
+          }}
+        />
+      )}
+
       {/* Toast */}
       {toastMessage && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-violet-700 border border-violet-400 px-5 py-2.5 shadow-lg animate-fade-in">
@@ -297,7 +317,11 @@ export default function DashboardPage() {
       <main className="max-w-lg mx-auto px-4 py-5 flex flex-col gap-5">
         {/* Tree */}
         <div className="flex flex-col items-center gap-1">
-          <TreeDisplay score={totalCycleScore} />
+          <TreeDisplay
+            score={totalCycleScore}
+            animating={harvestAnimating}
+            onAnimationComplete={handleHarvestAnimationComplete}
+          />
           {/* Rank info */}
           {(() => {
             const { rank, fruitCount } = getTreeRank(totalCycleScore);
