@@ -32,8 +32,6 @@ function lerp(a: number, b: number, t: number) {
 
 const CX = 160;
 const GROUND = 300;
-// SVG rendered size / viewBox size — used to convert SVG units → CSS px for fruitDrop
-const SVG_SCALE = 225 / 360;
 
 export default function TreeDisplay({ score, fruitCount, animating = false, onAnimationComplete }: Props) {
   const t = clamp(score / 1050, 0, 1);
@@ -80,7 +78,7 @@ export default function TreeDisplay({ score, fruitCount, animating = false, onAn
   ];
 
   return (
-    <svg viewBox="0 0 320 360" width="200" height="225" aria-label="育成中の木">
+    <svg viewBox="0 0 320 360" width="200" height="225" overflow="hidden" aria-label="育成中の木">
       {animating && (
         <defs>
           <radialGradient id="harvestGlow" cx="50%" cy="50%" r="50%">
@@ -138,7 +136,6 @@ export default function TreeDisplay({ score, fruitCount, animating = false, onAn
         const fxPos = CX + fx * crownR;
         const fyPos = crownCY + fy * crownR;
         const dropSvg = Math.round((GROUND - fruitR * 0.4) - fyPos);
-        const dropPx = Math.round(dropSvg * SVG_SCALE);
         return (
           <circle
             key={`fr${i}`}
@@ -149,7 +146,7 @@ export default function TreeDisplay({ score, fruitCount, animating = false, onAn
             style={animating ? ({
               transformBox: 'fill-box',
               transformOrigin: 'center bottom',
-              ['--drop']: `${dropPx}px`,
+              ['--drop']: `${dropSvg}px`,
               animation: 'fruitDrop 0.8s ease-in both',
               animationDelay: `${0.5 + i * 0.09}s`,
             } as React.CSSProperties) : undefined}
