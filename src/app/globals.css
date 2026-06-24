@@ -24,3 +24,28 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes glowPulse {
+  0%   { opacity: 0; scale: 0.6; }
+  30%  { opacity: 0.55; }
+  100% { opacity: 0; scale: 1.35; }
+}
+
+@keyframes flashFade {
+  0%   { opacity: 0; }
+  16%  { opacity: 0.45; }
+  100% { opacity: 0; }
+}
+
+@keyframes sparkPop {
+  0%   { scale: 0; opacity: 0; }
+  35%  { opacity: 1; }
+  100% { scale: 1.7; opacity: 0; }
+}
+
+@keyframes fruitDrop {
+  0%   { transform: translateY(0) scaleY(1); }
+  72%  { transform: translateY(var(--drop)) scaleY(1); }
+  84%  { transform: translateY(var(--drop)) scaleY(0.84); }
+  100% { transform: translateY(var(--drop)) scaleY(1); }
+}

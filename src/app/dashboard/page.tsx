@@ -3,9 +3,10 @@
 import { useAuthenticator } from "@aws-amplify/ui-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
 import CharacterDisplay from "@/components/CharacterDisplay";
+import TreeDisplay from "@/components/TreeDisplay";
 import ScoreBars from "@/components/ScoreBars";
 import TaskList from "@/components/TaskList";
 import { useCharacter } from "@/hooks/useCharacter";
@@ -35,6 +36,10 @@ function computeScores(logs: DailyLog[]): Scores {
   return scores;
 }
 
+function sumScores(scores: Scores): number {
+  return Object.values(scores).reduce((a, b) => a + b, 0);
+}
+
 export default function DashboardPage() {
   const { signOut, authStatus } = useAuthenticator((context) => [
     context.authStatus,
@@ -62,6 +67,12 @@ export default function DashboardPage() {
   const [evolutionMessage, setEvolutionMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Cycle-wide total score for tree growth
+  const [cycleTotalScore, setCycleTotalScore] = useState(0);
+
+  // Harvest animation state
+  const [harvestAnimating, setHarvestAnimating] = useState(false);
+
   useEffect(() => {
     if (authStatus === "unauthenticated") {
       router.replace("/login");
@@ -87,6 +98,23 @@ export default function DashboardPage() {
     }
 
     load();
+  }, [isAuthenticated, logsTrigger]);
+
+  // Load all logs for current cycle to compute tree growth
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    async function loadCycle() {
+      try {
+        const { data } = await client.models.DailyLog.list();
+        const allScores = computeScores(data ?? []);
+        setCycleTotalScore(sumScores(allScores));
+      } catch (err) {
+        console.error("Cycle DailyLog fetch error:", err);
+      }
+    }
+
+    loadCycle();
   }, [isAuthenticated, logsTrigger]);
 
   function showEvolutionToast(newStage?: string, newMidType?: string, newFinalType?: string) {
@@ -117,24 +145,25 @@ export default function DashboardPage() {
     setEvolutionMessage(null);
   }
 
-  async function handleReborn() {
-    const charName = finalType && finalType in CHARACTERS
-      ? CHARACTERS[finalType as keyof typeof CHARACTERS].name
-      : "このキャラ";
-    const ok = window.confirm(
-      `現在のキャラを図鑑に登録して、卵から育て直しますか？`
-    );
+  // Start harvest animation; actual harvest fires in onAnimationComplete
+  function handleHarvest() {
+    const ok = window.confirm(`収穫して、卵から育て直しますか？`);
     if (!ok) return;
+    setHarvestAnimating(true);
+  }
 
+  const handleAnimationComplete = useCallback(async () => {
+    setHarvestAnimating(false);
     const result = await rebornAsEgg();
     setLogsTrigger((n) => n + 1);
     if (result.success && result.recordedType) {
-      const recorded = result.recordedType in CHARACTERS
-        ? CHARACTERS[result.recordedType as keyof typeof CHARACTERS].name
-        : result.recordedType;
+      const recorded =
+        result.recordedType in CHARACTERS
+          ? CHARACTERS[result.recordedType as keyof typeof CHARACTERS].name
+          : result.recordedType;
       showToast(`図鑑に ${recorded} を登録しました`);
     }
-  }
+  }, [rebornAsEgg]);
 
   function showToast(message: string) {
     setEvolutionMessage(message);
@@ -169,7 +198,6 @@ export default function DashboardPage() {
         next.delete(task.id);
         return next;
       });
-      // タスク変更後に進化チェック (ステージ境界を跨いでいた場合に備えて)
       const result = await checkAndEvolve();
       if (result.evolved) {
         showEvolutionToast(result.newStage, result.midType, result.finalType);
@@ -192,6 +220,15 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      {/* Click-block overlay during harvest animation */}
+      {harvestAnimating && (
+        <div
+          className="fixed inset-0 z-50"
+          style={{ cursor: "wait" }}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
         <span className="font-mono font-bold text-violet-400 tracking-widest text-sm">
@@ -222,7 +259,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Evolution toast */}
+      {/* Evolution / harvest toast */}
       {evolutionMessage && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-violet-700 border border-violet-400 px-5 py-2.5 shadow-lg animate-fade-in">
           <p className="font-mono text-sm text-white tracking-wide whitespace-nowrap">
@@ -258,19 +295,28 @@ export default function DashboardPage() {
                 リセット (テスト)
               </button>
             </div>
-
-            {/* もう一度育てるボタン (最終形態のみ) */}
-            {stage === "final" && (
-              <button
-                onClick={handleReborn}
-                disabled={characterLoading}
-                className="mt-2 font-mono text-sm text-violet-300 hover:text-white border-2 border-violet-600 hover:border-violet-400 hover:bg-violet-900/30 px-4 py-2 transition-colors disabled:opacity-30 w-full"
-              >
-                🥚 もう一度育てる
-              </button>
-            )}
           </div>
           <ScoreBars scores={scores} />
+        </div>
+
+        {/* Tree visualization */}
+        <div className="flex flex-col items-center gap-2">
+          <TreeDisplay
+            totalScore={cycleTotalScore}
+            isAnimating={harvestAnimating}
+            onAnimationComplete={handleAnimationComplete}
+          />
+
+          {/* 収穫ボタン (最終形態のみ) */}
+          {stage === "final" && !harvestAnimating && (
+            <button
+              onClick={handleHarvest}
+              disabled={characterLoading}
+              className="font-mono text-sm text-amber-300 hover:text-white border-2 border-amber-600 hover:border-amber-400 hover:bg-amber-900/30 px-4 py-2 transition-colors disabled:opacity-30 w-full max-w-[320px]"
+            >
+              🍎 収穫する
+            </button>
+          )}
         </div>
 
         {/* Task list */}
