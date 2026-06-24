@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { client } from '@/lib/amplifyClient';
 import type { DailyLogSummary } from '@/lib/constraints';
 import { getTodayString, addDays } from '@/lib/constraints';
+import type { Schema } from '../../amplify/data/resource';
+
+type DailyLogRecord = Schema['DailyLog']['type'];
 
 export interface RecentLogEntry extends DailyLogSummary {
   numericValues?: Record<string, number>;
@@ -20,14 +23,19 @@ export function useRecentLogs(enabled: boolean = true, cycleStartDate?: string, 
       const effectiveToday = today ?? getTodayString();
       const startDate = cycleStartDate ?? addDays(effectiveToday, -6);
 
-      const { data } = await client.models.DailyLog.list({
-        filter: {
-          date: { between: [startDate, effectiveToday] },
-        },
-      });
+      const allData: DailyLogRecord[] = [];
+      let nt: string | null | undefined;
+      do {
+        const res = await client.models.DailyLog.list({
+          filter: { date: { between: [startDate, effectiveToday] } },
+          ...(nt ? { nextToken: nt } : {}),
+        });
+        allData.push(...(res.data ?? []));
+        nt = res.nextToken;
+      } while (nt);
 
       const byDate = new Map<string, { completedTaskIds: string[]; numericValues: Record<string, number> }>();
-      for (const log of data ?? []) {
+      for (const log of allData) {
         const existing = byDate.get(log.date) ?? { completedTaskIds: [], numericValues: {} };
         existing.completedTaskIds.push(log.taskId);
         if (log.numericValues) {

@@ -37,10 +37,10 @@ export default function SleepHoursInput({
   const catMeta = CATEGORY_META[task.category];
   const subCatMeta = task.subCategory ? CATEGORY_META[task.subCategory] : undefined;
 
-  const mainXpEarned = isCompleted && currentValue != null
+  const mainXpEarned = currentValue != null
     ? Math.round(task.mainXp * calcSleepHoursXp(currentValue))
     : null;
-  const subXpEarned = isCompleted && currentValue != null && task.subXp != null
+  const subXpEarned = currentValue != null && task.subXp != null
     ? Math.round(task.subXp * calcSleepHoursXp(currentValue))
     : null;
   const evalLabel = currentValue != null ? getSleepHoursLabel(currentValue) : null;
@@ -70,7 +70,7 @@ export default function SleepHoursInput({
         {/* Body */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <p className={`font-mono text-sm ${isCompleted ? 'text-zinc-400' : 'text-zinc-100'}`}>
+            <p className={`font-mono text-sm ${currentValue != null ? 'text-zinc-400' : 'text-zinc-100'}`}>
               {task.name}
             </p>
           </div>
@@ -78,7 +78,7 @@ export default function SleepHoursInput({
             {task.description}
           </p>
 
-          {isCompleted && currentValue != null && evalLabel ? (
+          {currentValue != null && evalLabel ? (
             /* Post-input state */
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs" style={{ color: evalLabel.color }}>

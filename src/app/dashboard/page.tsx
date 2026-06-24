@@ -8,7 +8,6 @@ import { getCurrentUser } from "aws-amplify/auth";
 import TreeDisplay from "@/components/TreeDisplay";
 import TaskList from "@/components/TaskList";
 import { useCharacter } from "@/hooks/useCharacter";
-import { useCharacterAnimation } from "@/hooks/useCharacterAnimation";
 import { useJournal } from "@/hooks/useJournal";
 import { useRecentLogs } from "@/hooks/useRecentLogs";
 import { useUserSettings } from "@/hooks/useUserSettings";
@@ -54,8 +53,6 @@ export default function DashboardPage() {
     submitNumericValue,
     clearNumericValue,
   } = useCharacter(isAuthenticated);
-
-  const { triggerReaction } = useCharacterAnimation();
 
   const effectiveToday = getCurrentDateString();
 
@@ -171,7 +168,6 @@ export default function DashboardPage() {
   }
 
   async function handleNumericSubmit(taskId: string, value: number) {
-    triggerReaction();
     await submitNumericValue(taskId, value);
     setLogsTrigger((n) => n + 1);
     refetchRecentLogs();
@@ -223,7 +219,6 @@ export default function DashboardPage() {
         await client.models.DailyLog.delete({ id: existing.id });
         setDailyLogs((prev) => prev.filter((log) => log.id !== existing.id));
       } else {
-        triggerReaction();
         const { userId } = await getCurrentUser();
         const today = getCurrentDateString();
         const { data } = await client.models.DailyLog.create({

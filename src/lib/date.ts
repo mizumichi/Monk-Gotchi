@@ -44,11 +44,3 @@ export function calculateDayNumber(cycleStartDate: string): number {
   return Math.max(1, diffDays + 1);
 }
 
-export type Stage = "egg" | "early" | "mid" | "final";
-
-export function getStage(dayNumber: number): Stage {
-  if (dayNumber === 1) return "egg";
-  if (dayNumber <= 3) return "early";
-  if (dayNumber <= 6) return "mid";
-  return "final";
-}
