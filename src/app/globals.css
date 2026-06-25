@@ -1,4 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&display=swap');
 @import "tailwindcss";
+
+@keyframes mgSway { 0%,100% { transform: rotate(-1.1deg); } 50% { transform: rotate(1.1deg); } }
+@keyframes mgFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes mgTwinkle { 0%,100% { opacity: .25; transform: scale(.7); } 50% { opacity: .9; transform: scale(1); } }
 
 :root {
   --background: #ffffff;

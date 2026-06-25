@@ -1,15 +1,18 @@
 "use client";
 
-import { CATEGORY_META, TYPE_META, type Task } from "@/data/tasks";
+import { CATEGORY_META, type Task } from "@/data/tasks";
 import { calcSleepHoursXp, getSleepHoursLabel } from "@/lib/sleepXp";
 
+const FONT = "'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif";
+const CAT_COLOR = "#5E6BB0"; // sleep category warm color
+
 const BUTTONS: { label: string; value: number }[] = [
-  { label: '5h', value: 5.0 },
-  { label: '6h', value: 6.0 },
-  { label: '7h', value: 7.0 },
-  { label: '8h', value: 8.0 },
-  { label: '9h', value: 9.0 },
-  { label: '10h+', value: 10.0 },
+  { label: "5h", value: 5.0 },
+  { label: "6h", value: 6.0 },
+  { label: "7h", value: 7.0 },
+  { label: "8h", value: 8.0 },
+  { label: "9h", value: 9.0 },
+  { label: "10h+", value: 10.0 },
 ];
 
 interface Props {
@@ -33,7 +36,6 @@ export default function SleepHoursInput({
   onOpenDetail,
   onToggleFavorite,
 }: Props) {
-  const typeMeta = TYPE_META[task.type];
   const catMeta = CATEGORY_META[task.category];
   const subCatMeta = task.subCategory ? CATEGORY_META[task.subCategory] : undefined;
 
@@ -46,98 +48,84 @@ export default function SleepHoursInput({
   const evalLabel = currentValue != null ? getSleepHoursLabel(currentValue) : null;
 
   return (
-    <div
-      className="bg-zinc-900 pr-2 py-3.5 hover:bg-zinc-800/60 transition-colors"
-      style={{ borderLeft: `4px solid ${typeMeta.borderColor}`, paddingLeft: '12px' }}
-    >
-      <div className="flex items-start gap-3">
-        {/* ★ button */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-          aria-label={isFavorite ? 'お気に入りから外す' : 'お気に入りに追加'}
-          className="flex-none w-6 h-6 flex items-center justify-center text-base leading-none transition-colors mt-0.5"
-        >
-          <span className={isFavorite ? 'text-amber-400' : 'text-zinc-600 hover:text-amber-400'}>
-            {isFavorite ? '★' : '☆'}
-          </span>
-        </button>
+    <div style={{ display: "flex", alignItems: "stretch", gap: 0, background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "16px", overflow: "hidden", boxShadow: "0 2px 6px rgba(90,70,35,.05)", fontFamily: FONT }}>
+      {/* Left accent */}
+      <div style={{ width: "5px", flexShrink: 0, background: CAT_COLOR }} />
 
-        {/* Icon */}
-        <span className="text-2xl leading-none flex-none mt-0.5" role="img" aria-hidden>
-          {task.icon}
-        </span>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "11px", padding: "12px 12px 12px 13px", flex: 1, minWidth: 0 }}>
+        {/* Icon + star column */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", flexShrink: 0 }}>
+          <div style={{ width: "42px", height: "42px", borderRadius: "13px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", background: CAT_COLOR + "1A" }}>
+            {task.icon}
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+            style={{ width: "26px", height: "26px", borderRadius: "50%", border: "none", padding: 0, background: isFavorite ? "#FFF6D6" : "transparent", fontSize: "15px", cursor: "pointer", color: isFavorite ? "#FFD24A" : "#C8BBA8", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            {isFavorite ? "★" : "☆"}
+          </button>
+        </div>
 
         {/* Body */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <p className={`font-mono text-sm ${currentValue != null ? 'text-zinc-400' : 'text-zinc-100'}`}>
-              {task.name}
-            </p>
-          </div>
-          <p className="font-mono text-xs text-zinc-500 mt-0.5 truncate">
-            {task.description}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: "13.5px", lineHeight: 1.35, wordBreak: "break-word", color: isCompleted ? "#A99B85" : "#43382A" }}>
+            {task.name}
           </p>
+          <p style={{ margin: 0, fontSize: "11.5px", color: "#A8987F", lineHeight: 1.3 }}>{task.description}</p>
 
           {currentValue != null && evalLabel ? (
-            /* Post-input state */
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs" style={{ color: evalLabel.color }}>
-                ✓ {currentValue}h と記録 ({evalLabel.label})
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+              <span style={{ fontSize: "11.5px", fontWeight: 700, color: evalLabel.color }}>
+                ✓ {currentValue}h ({evalLabel.label})
               </span>
-              <span className="font-mono text-xs text-emerald-500">
-                +{mainXpEarned} {catMeta.icon}{catMeta.label}
-                {subCatMeta && subXpEarned != null && (
-                  <span className="text-emerald-500/70"> · +{subXpEarned} {subCatMeta.label}</span>
-                )}
-              </span>
+              {mainXpEarned != null && (
+                <span style={{ fontSize: "10.5px", fontWeight: 700, borderRadius: "7px", padding: "2px 7px", color: CAT_COLOR, background: CAT_COLOR + "1F" }}>
+                  +{mainXpEarned} {catMeta.icon}{catMeta.label}
+                  {subCatMeta && subXpEarned != null && (
+                    <span style={{ opacity: 0.75 }}> · +{subXpEarned} {subCatMeta.label}</span>
+                  )}
+                </span>
+              )}
               <button
                 onClick={() => onClear(task.id)}
-                className="font-mono text-[10px] text-zinc-500 hover:text-red-400 border border-zinc-700 hover:border-red-700 px-1.5 py-0.5 transition-colors"
+                style={{ fontSize: "10.5px", color: "#B6A485", background: "#EDE4D1", border: "none", borderRadius: "6px", padding: "2px 8px", cursor: "pointer", fontFamily: FONT }}
               >
                 取り消す
               </button>
             </div>
           ) : (
-            /* Pre-input state */
             <>
-              <p className="font-mono text-xs text-zinc-500 mt-1.5">昨夜の睡眠時間は?</p>
-              <div className="flex gap-1.5 mt-1.5 flex-wrap">
+              <p style={{ margin: 0, fontSize: "11px", color: "#B6A485" }}>昨夜の睡眠時間は？</p>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                 {BUTTONS.map((btn) => (
                   <button
                     key={btn.value}
                     onClick={() => onSubmit(task.id, btn.value)}
-                    className="font-mono text-xs border px-2 py-1 transition-colors border-zinc-600 text-zinc-400 hover:border-violet-400 hover:text-violet-300"
+                    style={{ fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", color: CAT_COLOR, background: "#fff", border: `1.5px solid ${CAT_COLOR}40`, borderRadius: "8px", padding: "5px 10px", cursor: "pointer" }}
                   >
                     {btn.label}
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <span className="font-mono text-xs text-violet-400">
+              <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginTop: "2px" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontWeight: 700, fontSize: "10.5px", borderRadius: "7px", padding: "2px 7px", color: CAT_COLOR, background: CAT_COLOR + "1F" }}>
                   +{task.mainXp} {catMeta.icon}{catMeta.label}
                 </span>
                 {subCatMeta && task.subXp && (
-                  <>
-                    <span className="font-mono text-xs text-zinc-600">·</span>
-                    <span className="font-mono text-xs text-zinc-500">
-                      +{task.subXp} {subCatMeta.icon}{subCatMeta.label}
-                    </span>
-                  </>
+                  <span style={{ fontSize: "10px", color: "#B6A485", padding: "2px 0" }}>
+                    · +{task.subXp} {subCatMeta.icon}{subCatMeta.label} <span style={{ color: "#C8BBA8" }}>(7-9h で満点)</span>
+                  </span>
                 )}
-                <span className="font-mono text-xs text-zinc-600 ml-1">(7-9h で満点)</span>
               </div>
+              <button
+                onClick={onOpenDetail}
+                style={{ alignSelf: "flex-start", fontSize: "10px", color: "#C8BBA8", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT }}
+              >
+                ⓘ 詳細
+              </button>
             </>
           )}
         </div>
-
-        {/* ⓘ button */}
-        <button
-          onClick={onOpenDetail}
-          aria-label="詳細を見る"
-          className="flex-none w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-violet-400 transition-colors text-base"
-        >
-          ⓘ
-        </button>
       </div>
     </div>
   );

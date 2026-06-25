@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import {
   TASKS,
-  TYPE_META,
   CATEGORY_META,
   type Task,
 } from "@/data/tasks";
@@ -15,6 +14,16 @@ import {
 import TaskDetailModal from "@/components/TaskDetailModal";
 import SleepHoursInput from "@/components/SleepHoursInput";
 import JournalModal from "@/components/JournalModal";
+
+const FONT = "'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif";
+
+const WARM_CAT_COLORS: Record<string, string> = {
+  strength: "#C75B4A",
+  sleep: "#5E6BB0",
+  nutrition: "#5FA052",
+  environment: "#D6A33E",
+  mental: "#9B6BB0",
+};
 
 interface JournalEntry {
   id: string;
@@ -38,8 +47,8 @@ interface Props {
   toggleFavorite: (taskId: string) => void;
   isRoutineTab?: boolean;
   journals?: Record<string, JournalEntry | null>;
-  onJournalSave?: (slot: 'morning' | 'evening', mood: number, text: string) => Promise<void>;
-  onJournalDelete?: (slot: 'morning' | 'evening') => Promise<void>;
+  onJournalSave?: (slot: "morning" | "evening", mood: number, text: string) => Promise<void>;
+  onJournalDelete?: (slot: "morning" | "evening") => Promise<void>;
 }
 
 export default function TaskList({
@@ -75,31 +84,21 @@ export default function TaskList({
     return map;
   }, [recentLogs, today, cycleStartDate]);
 
-  // Empty routine state
   if (!loading && isRoutineTab && tasks.length === 0) {
     return (
       <>
-        <div className="border border-zinc-800 flex flex-col items-center justify-center py-16 px-6 text-center bg-zinc-900">
-          <div className="text-4xl mb-4">⭐</div>
-          <p className="font-mono text-sm text-zinc-300 font-bold mb-2">
-            ルーティンが空です
-          </p>
-          <p className="font-mono text-xs text-zinc-500 leading-relaxed">
-            各タスクの左側にある
-            <span className="text-amber-400 mx-1">☆</span>
-            を押すと
-            <br />
-            ここに毎日の定番タスクが集まります。
-          </p>
-          <p className="font-mono text-[10px] text-zinc-600 mt-4">
-            右のカテゴリタブからタスクを探してみましょう。
+        <div style={{ border: "1px dashed #DDD0B8", borderRadius: "20px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", textAlign: "center", background: "#FBF6EC", fontFamily: FONT }}>
+          <div style={{ fontSize: "36px", marginBottom: "12px" }}>⭐</div>
+          <p style={{ fontWeight: 800, fontSize: "14px", color: "#6E4A2A", margin: "0 0 6px" }}>ルーティンが空です</p>
+          <p style={{ fontSize: "12px", color: "#A8987F", lineHeight: 1.5, margin: 0 }}>
+            タスクの<span style={{ color: "#FFD24A" }}>★</span>を押すとここに集まります
           </p>
         </div>
         <TaskDetailModal task={detailTask} onClose={() => setDetailTask(null)} />
         <JournalModal
           task={journalTask}
-          slot={journalTask?.id === 'journal_morning' ? 'morning' : journalTask ? 'evening' : null}
-          existing={journalTask ? (journals[journalTask.id === 'journal_morning' ? 'morning' : 'evening'] ?? null) : null}
+          slot={journalTask?.id === "journal_morning" ? "morning" : journalTask ? "evening" : null}
+          existing={journalTask ? (journals[journalTask.id === "journal_morning" ? "morning" : "evening"] ?? null) : null}
           onSave={onJournalSave ?? (async () => {})}
           onDelete={onJournalDelete ?? (async () => {})}
           onClose={() => setJournalTask(null)}
@@ -110,22 +109,19 @@ export default function TaskList({
 
   return (
     <>
-      <div className="flex flex-col divide-y divide-zinc-800 border border-zinc-800">
+      <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
         {loading ? (
-          <div className="bg-zinc-900 px-4 py-8 flex items-center justify-center">
-            <p className="font-mono text-xs text-zinc-500 animate-pulse tracking-widest">
-              LOADING...
-            </p>
+          <div style={{ background: "#FBF6EC", borderRadius: "16px", padding: "32px 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <p style={{ fontFamily: FONT, fontSize: "12px", color: "#B6A485", fontWeight: 700 }}>読み込み中...</p>
           </div>
         ) : (
           tasks.map((task) => {
             const checked = checkedTaskIds.has(task.id);
             const pending = pendingTaskIds.has(task.id);
-            const typeMeta = TYPE_META[task.type];
             const catMeta = CATEGORY_META[task.category];
-            const subCatMeta = task.subCategory
-              ? CATEGORY_META[task.subCategory]
-              : undefined;
+            const subCatMeta = task.subCategory ? CATEGORY_META[task.subCategory] : undefined;
+            const catColor = WARM_CAT_COLORS[task.category] ?? catMeta.color;
+            const subCatColor = task.subCategory ? (WARM_CAT_COLORS[task.subCategory] ?? subCatMeta?.color ?? "#999") : "#999";
             const constraint = constraintMap[task.id];
             const isBlocked = !checked && constraint?.blocked === true;
             const showCount =
@@ -135,7 +131,7 @@ export default function TaskList({
             const isReasonExpanded = expandedReasonId === task.id;
             const fav = isFavorite(task.id);
 
-            if (task.taskKind === 'numeric') {
+            if (task.taskKind === "numeric") {
               return (
                 <SleepHoursInput
                   key={task.id}
@@ -151,91 +147,67 @@ export default function TaskList({
               );
             }
 
-            if (task.taskKind === 'journal') {
-              const slot = task.id === 'journal_morning' ? 'morning' : 'evening';
+            if (task.taskKind === "journal") {
+              const slot = task.id === "journal_morning" ? "morning" : "evening";
               const entry = journals[slot] ?? null;
               const isRecorded = entry !== null;
               return (
                 <div
                   key={task.id}
-                  className="flex flex-col bg-zinc-900 pr-2 py-3.5 hover:bg-zinc-800/60 transition-colors"
-                  style={{ borderLeft: `4px solid ${typeMeta.borderColor}`, paddingLeft: '8px' }}
+                  style={{
+                    display: "flex", alignItems: "stretch", gap: 0,
+                    background: "#FBF6EC", border: "1px solid #E6DBC4",
+                    borderRadius: "16px", overflow: "hidden",
+                    boxShadow: "0 2px 6px rgba(90,70,35,.05)",
+                    fontFamily: FONT,
+                  }}
                 >
-                  <div className="flex items-center gap-2">
-                    {/* ★ button */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleFavorite(task.id); }}
-                      aria-label={fav ? 'お気に入りから外す' : 'お気に入りに追加'}
-                      className="flex-none w-6 h-6 flex items-center justify-center text-base leading-none transition-colors"
-                    >
-                      <span className={fav ? 'text-amber-400' : 'text-zinc-600 hover:text-amber-400'}>
-                        {fav ? '★' : '☆'}
-                      </span>
-                    </button>
-
-                    {/* Icon */}
-                    <div className="flex-none">
-                      <span className="text-2xl leading-none" role="img" aria-hidden>{task.icon}</span>
+                  <div style={{ width: "5px", flexShrink: 0, background: catColor }} />
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "11px", padding: "12px 12px 12px 13px", flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", flexShrink: 0 }}>
+                      <div style={{ width: "42px", height: "42px", borderRadius: "13px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0, background: catColor + "1A" }}>
+                        {task.icon}
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleFavorite(task.id); }}
+                        style={{ width: "26px", height: "26px", borderRadius: "50%", border: "none", padding: 0, background: fav ? "#FFF6D6" : "transparent", fontSize: "15px", cursor: "pointer", color: fav ? "#FFD24A" : "#C8BBA8", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        {fav ? "★" : "☆"}
+                      </button>
                     </div>
-
-                    {/* Text */}
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-mono text-sm ${isRecorded ? 'text-zinc-400' : 'text-zinc-100'}`}>
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: "13.5px", lineHeight: 1.35, wordBreak: "break-word", color: isRecorded ? "#A99B85" : "#43382A", textDecoration: isRecorded ? "line-through" : "none" }}>
                         {task.name}
                       </p>
                       {isRecorded && entry ? (
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <span className="font-mono text-xs text-emerald-500">
-                            ✓ 気分 {entry.mood}/10
-                          </span>
-                          {entry.text && (
-                            <span className="font-mono text-xs text-zinc-500 truncate max-w-[160px]">
-                              {entry.text}
-                            </span>
-                          )}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "11.5px", color: "#5FA052", fontWeight: 700 }}>✓ 気分 {entry.mood}/10</span>
+                          {entry.text && <span style={{ fontSize: "11px", color: "#A8987F" }}>{entry.text.slice(0, 24)}</span>}
                         </div>
                       ) : (
-                        <p className="font-mono text-xs text-zinc-500 mt-0.5 truncate">
-                          {task.description}
-                        </p>
+                        <p style={{ margin: 0, fontSize: "11.5px", color: "#A8987F", lineHeight: 1.3 }}>{task.description}</p>
                       )}
                       {!isRecorded && (
-                        <span className="font-mono text-xs text-violet-400 mt-1 block">
-                          +{task.mainXp} {catMeta.icon}{catMeta.label}
-                        </span>
+                        <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginTop: "2px" }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontWeight: 700, fontSize: "10.5px", borderRadius: "7px", padding: "2px 7px", color: catColor, background: catColor + "1F" }}>
+                            +{task.mainXp} {catMeta.icon}{catMeta.label}
+                          </span>
+                        </div>
                       )}
                     </div>
-
-                    {/* ⓘ button */}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
-                      aria-label="詳細を見る"
-                      className="flex-none w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-violet-400 transition-colors text-base"
-                    >
-                      ⓘ
-                    </button>
-
-                    {/* Journal open button */}
-                    <div className="flex-none flex flex-col items-center gap-0.5">
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", flexShrink: 0, width: "52px", paddingTop: "2px" }}>
                       <button
                         onClick={() => setJournalTask(task)}
-                        aria-label={isRecorded ? `${task.name}を編集` : `${task.name}を記録`}
-                        className={`w-6 h-6 rounded-full border-2 transition-colors flex items-center justify-center ${
-                          isRecorded
-                            ? 'border-emerald-500 bg-emerald-500 hover:bg-emerald-400 hover:border-emerald-400'
-                            : 'border-zinc-600 hover:border-violet-400'
-                        }`}
+                        style={{ width: "30px", height: "30px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, border: isRecorded ? `2px solid ${catColor}` : "2px solid #DBCBAF", background: isRecorded ? catColor : "#fff" }}
                       >
-                        {isRecorded ? (
-                          <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 12 12" fill="none">
-                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        {isRecorded && (
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M3 8.4l3.2 3.2L13 5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
-                        ) : (
-                          <span className="text-[10px] text-zinc-400">📓</span>
                         )}
                       </button>
-                      <span className="font-mono text-[9px] text-zinc-600 whitespace-nowrap">
-                        {isRecorded ? '編集' : '記録'}
+                      <span style={{ fontSize: "9.5px", fontWeight: 700, textAlign: "center", lineHeight: 1.2, color: isRecorded ? catColor : "#B6A485" }}>
+                        {isRecorded ? "編集" : "記録"}
                       </span>
                     </div>
                   </div>
@@ -243,160 +215,102 @@ export default function TaskList({
               );
             }
 
+            // Standard check task
             return (
-              <div
-                key={task.id}
-                className={`flex flex-col bg-zinc-900 pr-2 py-3.5 transition-colors ${
-                  isBlocked ? "opacity-50 grayscale" : "hover:bg-zinc-800/60"
-                }`}
-                style={{
-                  borderLeft: `4px solid ${typeMeta.borderColor}`,
-                  paddingLeft: "8px",
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  {/* ★ button */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleFavorite(task.id); }}
-                    aria-label={fav ? 'お気に入りから外す' : 'お気に入りに追加'}
-                    className="flex-none w-6 h-6 flex items-center justify-center text-base leading-none transition-colors"
-                  >
-                    <span className={fav ? 'text-amber-400' : 'text-zinc-600 hover:text-amber-400'}>
-                      {fav ? '★' : '☆'}
-                    </span>
-                  </button>
-
-                  {/* Icon */}
-                  <div className="flex-none">
-                    <span className="text-2xl leading-none" role="img" aria-hidden>
-                      {task.icon}
-                    </span>
-                  </div>
-
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p
-                        className={`font-mono text-sm ${
-                          checked ? "text-zinc-400 line-through" : "text-zinc-100"
-                        }`}
+              <div key={task.id} style={{ fontFamily: FONT, opacity: isBlocked ? 0.55 : 1, filter: isBlocked ? "grayscale(.4)" : undefined }}>
+                <div style={{ display: "flex", alignItems: "stretch", gap: 0, background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "16px", overflow: "hidden", boxShadow: "0 2px 6px rgba(90,70,35,.05)" }}>
+                  <div style={{ width: "5px", flexShrink: 0, background: catColor }} />
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "11px", padding: "12px 12px 12px 13px", flex: 1, minWidth: 0 }}>
+                    {/* Icon + star column */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", flexShrink: 0 }}>
+                      <div style={{ width: "42px", height: "42px", borderRadius: "13px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "21px", flexShrink: 0, background: catColor + "1A" }}>
+                        {task.icon}
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleFavorite(task.id); }}
+                        style={{ width: "26px", height: "26px", borderRadius: "50%", border: "none", padding: 0, background: fav ? "#FFF6D6" : "transparent", fontSize: "15px", cursor: "pointer", color: fav ? "#FFD24A" : "#C8BBA8", display: "flex", alignItems: "center", justifyContent: "center" }}
                       >
+                        {fav ? "★" : "☆"}
+                      </button>
+                    </div>
+
+                    {/* Main content */}
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
+                      {/* Badges */}
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        {task.frequency === "weekly" && (
+                          <span style={{ fontSize: "9.5px", fontWeight: 800, color: "#8A6BB0", background: "#EFE7F6", borderRadius: "6px", padding: "2px 6px" }}>週次</span>
+                        )}
+                        {task.type === "avoidance" && (
+                          <span style={{ fontSize: "9.5px", fontWeight: 800, color: "#C58A2A", background: "#FBF0D8", borderRadius: "6px", padding: "2px 6px" }}>⚠ 回避</span>
+                        )}
+                        {task.frequency === "optional" && (
+                          <span style={{ fontSize: "9.5px", fontWeight: 800, color: "#7A9BBF", background: "#E8F0F6", borderRadius: "6px", padding: "2px 6px" }}>任意</span>
+                        )}
+                      </div>
+                      {/* Name */}
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: "13.5px", lineHeight: 1.35, wordBreak: "break-word", color: checked ? "#A99B85" : "#43382A", textDecoration: checked ? "line-through" : "none" }}>
                         {task.name}
                       </p>
-                      {task.frequency !== "daily" && (
-                        <span className="font-mono text-[9px] border border-zinc-700 text-zinc-500 px-1 leading-tight whitespace-nowrap">
-                          {task.frequency === "weekly" ? "週次" : "任意"}
-                        </span>
-                      )}
-                    </div>
-                    <p className="font-mono text-xs text-zinc-500 truncate mt-0.5">
-                      {task.description}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      <span
-                        className={`font-mono text-xs ${
-                          checked ? "text-emerald-500" : "text-violet-400"
-                        }`}
-                      >
-                        +{task.mainXp} {catMeta.icon}
-                        {catMeta.label}
-                      </span>
-                      {subCatMeta && task.subXp && (
-                        <>
-                          <span className="font-mono text-xs text-zinc-600">·</span>
-                          <span
-                            className={`font-mono text-xs ${
-                              checked ? "text-emerald-500/70" : "text-zinc-500"
-                            }`}
-                          >
-                            +{task.subXp} {subCatMeta.icon}
-                            {subCatMeta.label}
-                          </span>
-                        </>
-                      )}
+                      {/* Description */}
+                      <p style={{ margin: 0, fontSize: "11.5px", color: "#A8987F", lineHeight: 1.3 }}>{task.description}</p>
+                      {/* Weekly count */}
                       {showCount && (
-                        <span className="font-mono text-[10px] text-zinc-600">
-                          · このサイクル {constraint.achievementCount}/{constraint.cycleLimit}回
+                        <p style={{ margin: "1px 0 0", fontSize: "10.5px", color: "#B6A485" }}>
+                          このサイクル {constraint.achievementCount}/{constraint.cycleLimit}回
+                        </p>
+                      )}
+                      {/* XP chips */}
+                      <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", marginTop: "2px" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontWeight: 700, fontSize: "10.5px", borderRadius: "7px", padding: "2px 7px", whiteSpace: "nowrap", color: catColor, background: catColor + "1F" }}>
+                          +{task.mainXp} {catMeta.icon}{catMeta.label}
                         </span>
-                      )}
+                        {subCatMeta && task.subXp && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontWeight: 700, fontSize: "10.5px", borderRadius: "7px", padding: "2px 7px", whiteSpace: "nowrap", color: subCatColor, background: subCatColor + "1F" }}>
+                            +{task.subXp} {subCatMeta.icon}{subCatMeta.label}
+                          </span>
+                        )}
+                      </div>
+                      {/* Detail button (subtle) */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
+                        style={{ alignSelf: "flex-start", marginTop: "2px", fontSize: "10px", color: "#C8BBA8", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT }}
+                      >
+                        ⓘ 詳細
+                      </button>
                     </div>
-                  </div>
 
-                  {/* ⓘ button */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
-                    aria-label="詳細を見る"
-                    className="flex-none w-7 h-7 flex items-center justify-center text-zinc-600 hover:text-violet-400 transition-colors text-base"
-                  >
-                    ⓘ
-                  </button>
-
-                  {/* Check button */}
-                  <div className="flex-none flex flex-col items-center gap-0.5">
-                    <button
-                      onClick={() => {
-                        if (isBlocked) {
-                          setExpandedReasonId((prev) =>
-                            prev === task.id ? null : task.id
-                          );
-                          return;
-                        }
-                        onToggle(task);
-                      }}
-                      disabled={pending}
-                      aria-label={
-                        isBlocked
-                          ? `${task.name}: 制約あり`
-                          : checked
-                          ? `${task.name}を未完了にする`
-                          : task.type === "avoidance"
-                          ? `${task.name}: 回避できた`
-                          : `${task.name}を完了にする`
-                      }
-                      className={`w-6 h-6 rounded-full border-2 transition-colors flex items-center justify-center ${
-                        pending
-                          ? "border-zinc-700 opacity-50 cursor-not-allowed"
-                          : isBlocked
-                          ? "border-zinc-700 cursor-pointer"
-                          : checked
-                          ? "border-emerald-500 bg-emerald-500 hover:bg-emerald-400 hover:border-emerald-400"
-                          : task.type === "avoidance"
-                          ? "border-blue-500 hover:border-blue-400 hover:bg-blue-900/30"
-                          : "border-zinc-600 hover:border-violet-400"
-                      }`}
-                    >
-                      {isBlocked && (
-                        <span className="text-[10px] text-zinc-500">🔒</span>
-                      )}
-                      {checked && !pending && !isBlocked && (
-                        <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 12 12" fill="none">
-                          <path
-                            d="M2 6l3 3 5-5"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      )}
-                      {pending && (
-                        <div className="w-2.5 h-2.5 border border-zinc-500 border-t-transparent rounded-full animate-spin" />
-                      )}
-                    </button>
-                    <span className="font-mono text-[9px] text-zinc-600 whitespace-nowrap">
-                      {isBlocked
-                        ? "NG"
-                        : task.type === "avoidance"
-                        ? "回避できた"
-                        : "できた"}
-                    </span>
+                    {/* Check control */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", flexShrink: 0, width: "52px", paddingTop: "2px" }}>
+                      <button
+                        onClick={() => {
+                          if (isBlocked) { setExpandedReasonId((prev) => prev === task.id ? null : task.id); return; }
+                          onToggle(task);
+                        }}
+                        disabled={pending}
+                        style={{ width: "30px", height: "30px", borderRadius: "50%", cursor: pending ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, border: checked ? `2px solid ${catColor}` : "2px solid #DBCBAF", background: checked ? catColor : "#fff", opacity: pending ? 0.5 : 1 }}
+                      >
+                        {isBlocked && <span style={{ fontSize: "10px" }}>🔒</span>}
+                        {checked && !pending && !isBlocked && (
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M3 8.4l3.2 3.2L13 5" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                        {pending && (
+                          <div className="w-2.5 h-2.5 border border-amber-300 border-t-transparent rounded-full animate-spin" />
+                        )}
+                      </button>
+                      <span style={{ fontSize: "9.5px", fontWeight: 700, textAlign: "center", lineHeight: 1.2, color: checked ? catColor : "#B6A485" }}>
+                        {isBlocked ? "NG" : task.type === "avoidance" ? (checked ? "回避できた" : "回避する") : "できた"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Inline constraint reason */}
+                {/* Constraint reason */}
                 {isBlocked && isReasonExpanded && (
-                  <div className="mt-2 mr-1 px-3 py-2 bg-amber-950/40 border border-amber-800/50">
-                    <p className="font-mono text-[11px] text-amber-300 leading-relaxed">
+                  <div style={{ marginTop: "6px", padding: "8px 13px", background: "#FBF0D8", borderRadius: "10px", border: "1px solid #E8D8A8" }}>
+                    <p style={{ margin: 0, fontSize: "11px", color: "#C58A2A", lineHeight: 1.4, fontFamily: FONT }}>
                       🔒 {constraint.reason}
                     </p>
                   </div>
@@ -410,8 +324,8 @@ export default function TaskList({
       <TaskDetailModal task={detailTask} onClose={() => setDetailTask(null)} />
       <JournalModal
         task={journalTask}
-        slot={journalTask?.id === 'journal_morning' ? 'morning' : journalTask ? 'evening' : null}
-        existing={journalTask ? (journals[journalTask.id === 'journal_morning' ? 'morning' : 'evening'] ?? null) : null}
+        slot={journalTask?.id === "journal_morning" ? "morning" : journalTask ? "evening" : null}
+        existing={journalTask ? (journals[journalTask.id === "journal_morning" ? "morning" : "evening"] ?? null) : null}
         onSave={onJournalSave ?? (async () => {})}
         onDelete={onJournalDelete ?? (async () => {})}
         onClose={() => setJournalTask(null)}

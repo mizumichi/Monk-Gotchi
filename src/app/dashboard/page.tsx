@@ -7,36 +7,50 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
 import TreeDisplay from "@/components/TreeDisplay";
 import TaskList from "@/components/TaskList";
+import JournalModal from "@/components/JournalModal";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useJournal } from "@/hooks/useJournal";
 import { useRecentLogs } from "@/hooks/useRecentLogs";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
-import { formatDayLabel } from "@/lib/cycle";
 import { buildAggregatesForDays, getTreeRank, type DailyLogLike } from "@/lib/evolution";
-import { TASKS, type Category, type Task } from "@/data/tasks";
+import { TASKS, type Category, type Task, getTaskById } from "@/data/tasks";
 import type { Schema } from "../../../amplify/data/resource";
 
 type DailyLog = Schema["DailyLog"]["type"];
 type Scores = Record<Category, number>;
+type TabKey = "routine" | "strength" | "sleep" | "nutrition" | "environment" | "mental";
 
-type TabKey = 'routine' | 'strength' | 'sleep' | 'nutrition' | 'environment' | 'mental';
+const FONT = "'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif";
 
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'routine',     label: 'ルーティン', icon: '⭐' },
-  { key: 'strength',    label: '筋トレ',     icon: '💪' },
-  { key: 'sleep',       label: '睡眠',       icon: '😴' },
-  { key: 'nutrition',   label: '栄養',       icon: '🥩' },
-  { key: 'environment', label: '環境',       icon: '☀️' },
-  { key: 'mental',      label: '精神',       icon: '🧘' },
+const TABS: { key: TabKey; label: string; icon: string; color: string }[] = [
+  { key: "routine",     label: "ルーティン", icon: "⭐", color: "#C77B4A" },
+  { key: "strength",    label: "筋トレ",     icon: "💪", color: "#C75B4A" },
+  { key: "sleep",       label: "睡眠",       icon: "😴", color: "#5E6BB0" },
+  { key: "nutrition",   label: "栄養",       icon: "🥩", color: "#5FA052" },
+  { key: "environment", label: "環境",       icon: "☀️", color: "#D6A33E" },
+  { key: "mental",      label: "精神",       icon: "🧘", color: "#9B6BB0" },
 ];
 
+const CAT_COLORS: Record<string, string> = {
+  strength: "#C75B4A",
+  sleep: "#5E6BB0",
+  nutrition: "#5FA052",
+  environment: "#D6A33E",
+  mental: "#9B6BB0",
+};
+
+const CAT_META: Record<string, { name: string; icon: string }> = {
+  strength:    { name: "筋トレ", icon: "💪" },
+  sleep:       { name: "睡眠",   icon: "😴" },
+  nutrition:   { name: "栄養",   icon: "🥩" },
+  environment: { name: "環境",   icon: "☀️" },
+  mental:      { name: "精神",   icon: "🧘" },
+};
 
 export default function DashboardPage() {
-  const { signOut, authStatus } = useAuthenticator((context) => [
-    context.authStatus,
-  ]);
+  const { signOut, authStatus } = useAuthenticator((context) => [context.authStatus]);
   const router = useRouter();
   const isAuthenticated = authStatus === "authenticated";
 
@@ -46,7 +60,6 @@ export default function DashboardPage() {
     dateOverride,
     isLoading: characterLoading,
     numericValues,
-    fruitType,
     advanceDay,
     resetDate,
     harvest,
@@ -56,13 +69,11 @@ export default function DashboardPage() {
   } = useCharacter(isAuthenticated);
 
   const effectiveToday = getCurrentDateString();
-
   const { logs: recentLogs, fullLogs, refetch: refetchRecentLogs } = useRecentLogs(isAuthenticated, cycleStartDate, effectiveToday);
   const { journals, saveJournal, deleteJournal } = useJournal(effectiveToday);
-
   const { favoriteTaskIds, isFavorite, toggleFavorite } = useUserSettings();
 
-  const [activeTab, setActiveTab] = useState<TabKey>('routine');
+  const [activeTab, setActiveTab] = useState<TabKey>("routine");
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
@@ -71,15 +82,14 @@ export default function DashboardPage() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [harvestAnimating, setHarvestAnimating] = useState(false);
   const harvestScoreRef = useRef(0);
+  const [showBalance, setShowBalance] = useState(false);
+  const [journalModalSlot, setJournalModalSlot] = useState<"morning" | "evening" | null>(null);
 
   const filteredTasks = useMemo(() => {
-    if (activeTab === 'routine') {
-      return TASKS.filter((t) => favoriteTaskIds.includes(t.id));
-    }
+    if (activeTab === "routine") return TASKS.filter((t) => favoriteTaskIds.includes(t.id));
     return TASKS.filter((t) => t.category === activeTab);
   }, [activeTab, favoriteTaskIds]);
 
-  // Cumulative cycle scores
   const cycleScores = useMemo<Scores>(() => {
     const agg = buildAggregatesForDays(fullLogs as DailyLogLike[], cycleStartDate, cycleInfo.dayN);
     return agg.earnedXp as Scores;
@@ -90,15 +100,20 @@ export default function DashboardPage() {
     [cycleScores],
   );
 
+  // Sky gradient by time of day
+  const sky = useMemo(() => {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 10) return { top: "#FBE0C4", bot: "#F2EAD4", orb: "#FFD27A", glow: "rgba(255,200,120,.6)" };
+    if (h >= 18 || h < 5)  return { top: "#313B5C", bot: "#5A6794", orb: "#F4F1DE", glow: "rgba(244,241,222,.45)" };
+    return { top: "#C2E2F1", bot: "#EBF4DE", orb: "#FFE08A", glow: "rgba(255,224,138,.55)" };
+  }, []);
+
   useEffect(() => {
-    if (authStatus === "unauthenticated") {
-      router.replace("/login");
-    }
+    if (authStatus === "unauthenticated") router.replace("/login");
   }, [authStatus, router]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
-
     async function load() {
       setLogsLoading(true);
       try {
@@ -110,7 +125,7 @@ export default function DashboardPage() {
             filter: { date: { eq: today } },
             ...(nt ? { nextToken: nt } : {}),
           });
-          (res.data ?? []).forEach(d => allData.push(d));
+          (res.data ?? []).forEach((d) => allData.push(d));
           nt = res.nextToken;
         } while (nt);
         setDailyLogs(allData);
@@ -120,7 +135,6 @@ export default function DashboardPage() {
         setLogsLoading(false);
       }
     }
-
     load();
   }, [isAuthenticated, logsTrigger]);
 
@@ -130,7 +144,7 @@ export default function DashboardPage() {
   }
 
   async function handlePurgeAllData() {
-    const ok = window.confirm('すべての記録とキャラを初期化します。この操作は取り消せません。よろしいですか？');
+    const ok = window.confirm("すべての記録とキャラを初期化します。この操作は取り消せません。よろしいですか？");
     if (!ok) return;
     setDailyLogs([]);
     await purgeAllData();
@@ -145,7 +159,7 @@ export default function DashboardPage() {
   }
 
   async function handleHarvest() {
-    const ok = window.confirm('今サイクルを収穫して、新サイクルを始めますか？');
+    const ok = window.confirm("今サイクルを収穫して、新サイクルを始めますか？");
     if (!ok) return;
     harvestScoreRef.current = totalCycleScore;
     setHarvestAnimating(true);
@@ -157,7 +171,7 @@ export default function DashboardPage() {
     const result = await harvest(harvestScoreRef.current);
     setLogsTrigger((n) => n + 1);
     if (result.success) {
-      showToast('収穫しました！');
+      showToast("収穫しました！");
       refetchRecentLogs();
     }
   }
@@ -180,11 +194,11 @@ export default function DashboardPage() {
     refetchRecentLogs();
   }
 
-  async function handleJournalSave(slot: 'morning' | 'evening', mood: number, text: string) {
+  async function handleJournalSave(slot: "morning" | "evening", mood: number, text: string) {
     const { created } = await saveJournal(slot, mood, text);
     if (created) {
       const { userId } = await getCurrentUser();
-      const taskId = slot === 'morning' ? 'journal_morning' : 'journal_evening';
+      const taskId = slot === "morning" ? "journal_morning" : "journal_evening";
       const task = TASKS.find((t) => t.id === taskId);
       if (task) {
         const today = getCurrentDateString();
@@ -201,9 +215,9 @@ export default function DashboardPage() {
     refetchRecentLogs();
   }
 
-  async function handleJournalDelete(slot: 'morning' | 'evening') {
+  async function handleJournalDelete(slot: "morning" | "evening") {
     await deleteJournal(slot);
-    const taskId = slot === 'morning' ? 'journal_morning' : 'journal_evening';
+    const taskId = slot === "morning" ? "journal_morning" : "journal_evening";
     const existing = dailyLogs.find((log) => log.taskId === taskId);
     if (existing) {
       await client.models.DailyLog.delete({ id: existing.id });
@@ -245,181 +259,272 @@ export default function DashboardPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
-        <p className="font-mono text-zinc-500 tracking-widest text-sm animate-pulse">
-          LOADING...
-        </p>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#E7DECB", fontFamily: FONT }}>
+        <p style={{ color: "#A8987F", fontWeight: 700 }}>読み込み中...</p>
       </div>
     );
   }
 
   const checkedTaskIds = new Set(dailyLogs.map((log) => log.taskId));
+  const daysLeft = Math.max(0, 7 - cycleInfo.dayN);
+  const dayDots = Array.from({ length: 7 }, (_, i) => i < cycleInfo.dayN);
+  const remainingText = daysLeft > 0 ? `あと${daysLeft}日` : "収穫の日！";
+  const morningJournal = journals["morning"];
+
+  const journalModalTask = journalModalSlot === "morning"
+    ? getTaskById("journal_morning")
+    : journalModalSlot === "evening"
+    ? getTaskById("journal_evening")
+    : null;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
-        <span className="font-mono font-bold text-violet-400 tracking-widest text-sm">
-          MONK-GOTCHI
-        </span>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/orchard"
-            className="font-mono text-xs text-zinc-400 hover:text-violet-300 border border-zinc-700 hover:border-violet-600 px-3 py-1.5 transition-colors"
-          >
-            🌳 果樹園
-          </Link>
-          <button
-            onClick={signOut}
-            className="font-mono text-xs text-zinc-400 hover:text-zinc-100 border border-zinc-700 hover:border-zinc-500 px-3 py-1.5 transition-colors"
-          >
-            サインアウト
-          </button>
-        </div>
-      </header>
+    <div style={{ height: "100vh", display: "flex", justifyContent: "center", background: "#E7DECB", overflow: "hidden", fontFamily: FONT }}>
+      <div style={{ width: "390px", maxWidth: "100%", height: "100%", background: "#F3ECDD", position: "relative", boxShadow: "0 0 60px rgba(80,60,30,.15)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-      {/* Date override banner */}
-      {dateOverride && (
-        <div className="bg-amber-950/60 border-b border-amber-800/60 px-4 py-1 text-center">
-          <span className="font-mono text-[10px] text-amber-400 tracking-widest">
-            [テスト中: {dateOverride}]
-          </span>
-        </div>
-      )}
+        {/* Click-blocking overlay during harvest animation */}
+        {harvestAnimating && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 40, cursor: "wait", pointerEvents: "all" }} />
+        )}
 
-      {/* Click-blocking overlay during harvest animation */}
-      {harvestAnimating && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 40,
-            cursor: 'wait',
-            pointerEvents: 'all',
-          }}
-        />
-      )}
-
-      {/* Toast */}
-      {toastMessage && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-violet-700 border border-violet-400 px-5 py-2.5 shadow-lg animate-fade-in">
-          <p className="font-mono text-sm text-white tracking-wide whitespace-nowrap">
+        {/* Toast */}
+        {toastMessage && (
+          <div style={{ position: "fixed", top: "64px", left: "50%", transform: "translateX(-50%)", zIndex: 50, background: "#5A7A33", color: "#fff", padding: "10px 20px", borderRadius: "999px", fontWeight: 700, fontSize: "13px", whiteSpace: "nowrap", boxShadow: "0 4px 12px rgba(80,60,30,.25)", fontFamily: FONT }}>
             {toastMessage}
-          </p>
-        </div>
-      )}
-
-      {/* Main content */}
-      <main className="max-w-lg mx-auto px-4 py-5 flex flex-col gap-5">
-        {/* Tree */}
-        <div className="flex flex-col items-center gap-1">
-          <TreeDisplay
-            score={totalCycleScore}
-            fruitType={fruitType}
-            animating={harvestAnimating}
-            onAnimationComplete={handleHarvestAnimationComplete}
-          />
-          {/* Rank info */}
-          {(() => {
-            const { rank, fruitCount } = getTreeRank(totalCycleScore);
-            const rankLabel = rank === 'low' ? 'いまいち' : rank === 'mid' ? '普通' : 'だいぶ良い';
-            const rankColor = rank === 'low' ? 'text-zinc-400' : rank === 'mid' ? 'text-violet-300' : 'text-emerald-400';
-            const daysLeft = Math.max(0, 7 - cycleInfo.dayN);
-            return (
-              <div className="flex items-center gap-3 font-mono text-xs">
-                <span className="text-zinc-500">{totalCycleScore}pt</span>
-                <span className={rankColor}>{rankLabel}</span>
-                <span className="text-zinc-400">🍎 {fruitCount}個</span>
-                {daysLeft > 0 && (
-                  <span className="text-zinc-600">あと{daysLeft}日</span>
-                )}
-              </div>
-            );
-          })()}
-          <p className="font-mono text-xs text-zinc-400 tracking-wider">
-            {formatDayLabel(cycleInfo)}
-          </p>
-          <div className="flex gap-1">
-            <button
-              onClick={handleAdvanceDay}
-              disabled={characterLoading}
-              className="font-mono text-[10px] text-zinc-600 hover:text-zinc-400 border border-zinc-800 hover:border-zinc-600 px-2 py-0.5 transition-colors disabled:opacity-30"
-            >
-              ＋1日 (テスト)
-            </button>
-            <button
-              onClick={handleResetDate}
-              disabled={characterLoading}
-              className="font-mono text-[10px] text-zinc-600 hover:text-amber-400 border border-zinc-800 hover:border-amber-700 px-2 py-0.5 transition-colors disabled:opacity-30"
-            >
-              リセット (テスト)
-            </button>
-            <button
-              onClick={handlePurgeAllData}
-              disabled={characterLoading}
-              className="font-mono text-[10px] text-zinc-600 hover:text-red-400 border border-zinc-800 hover:border-red-700 px-2 py-0.5 transition-colors disabled:opacity-30"
-            >
-              全消去 (テスト)
-            </button>
           </div>
+        )}
 
-          {(cycleInfo.phase === 'final' || cycleInfo.isOverflow) && (
-            <div className="flex flex-col items-center gap-1 mt-1 w-full">
-              {cycleInfo.isOverflow && (
-                <p className="font-mono text-[10px] text-amber-400">
-                  収穫期を過ぎています
-                </p>
-              )}
-              <button
-                onClick={handleHarvest}
-                disabled={characterLoading}
-                className="font-mono text-sm border-2 px-4 py-2 transition-colors disabled:opacity-30 w-full text-emerald-300 hover:text-white border-emerald-600 hover:border-emerald-400 hover:bg-emerald-900/30"
-              >
-                🍎 収穫する
-              </button>
+        {/* Sticky top */}
+        <div style={{ flexShrink: 0, zIndex: 20 }}>
+          {dateOverride && (
+            <div style={{ background: "rgba(214,163,62,.12)", borderBottom: "1px solid rgba(214,163,62,.25)", padding: "3px 16px", textAlign: "center" }}>
+              <span style={{ fontSize: "10px", fontWeight: 800, color: "#C58A2A", letterSpacing: ".08em" }}>テスト中: {dateOverride}</span>
             </div>
           )}
+          <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 12px", background: "#F3ECDD", borderBottom: "1px solid #E4D9C2" }}>
+            <span style={{ fontWeight: 800, fontSize: "15px", letterSpacing: ".08em", color: "#6E4A2A", whiteSpace: "nowrap" }}>MONK·GOTCHI</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <Link
+                href="/orchard"
+                style={{ display: "flex", alignItems: "center", gap: "4px", fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", color: "#5A7A33", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "999px", padding: "6px 11px", textDecoration: "none", whiteSpace: "nowrap" }}
+              >
+                <span>🧺</span>果樹園
+              </Link>
+              <button
+                onClick={() => setShowBalance(true)}
+                style={{ display: "flex", alignItems: "center", gap: "4px", fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", color: "#5A7A33", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "999px", padding: "6px 11px", cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                <span>📊</span>バランス
+              </button>
+              <button
+                onClick={signOut}
+                title="サインアウト"
+                style={{ color: "#9A8B76", background: "#EFE7D6", border: "1.5px solid #E0D4BD", borderRadius: "50%", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" stroke="#9A8B76" strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M10 11l3-3-3-3" stroke="#9A8B76" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M13 8H6" stroke="#9A8B76" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          </header>
+        </div>
+
+        {/* Hero tree section */}
+        <div style={{ flexShrink: 0, padding: "12px 16px 0" }}>
+          <section style={{ borderRadius: "24px", overflow: "hidden", boxShadow: "0 6px 20px rgba(90,70,35,.12)", border: "1px solid #E6DBC4" }}>
+            <div style={{ position: "relative", height: "236px", background: `linear-gradient(180deg, ${sky.top}, ${sky.bot})`, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+              {/* Sun/moon */}
+              <div style={{ position: "absolute", top: "22px", right: "30px", width: "46px", height: "46px", borderRadius: "50%", background: sky.orb, boxShadow: `0 0 30px 6px ${sky.glow}` }} />
+              {/* Twinkles */}
+              <div style={{ position: "absolute", top: "40px", left: "42px", fontSize: "13px", animation: "mgTwinkle 2.6s ease-in-out infinite" }}>✨</div>
+              <div style={{ position: "absolute", top: "74px", left: "280px", fontSize: "11px", animation: "mgTwinkle 3.2s ease-in-out .6s infinite" }}>✨</div>
+              {/* Score pill */}
+              <div style={{ position: "absolute", top: "14px", left: "14px", display: "flex", alignItems: "baseline", gap: "4px", background: "rgba(255,253,247,.82)", backdropFilter: "blur(4px)", borderRadius: "999px", padding: "5px 13px", boxShadow: "0 2px 8px rgba(70,50,20,.12)", whiteSpace: "nowrap" }}>
+                <span style={{ fontWeight: 800, fontSize: "15px", color: "#6E4A2A" }}>{totalCycleScore}</span>
+                <span style={{ fontSize: "11px", color: "#A8987F" }}>pt</span>
+              </div>
+              {/* Tree */}
+              <div style={{ marginBottom: "-6px", animation: "mgFloat 5s ease-in-out infinite", transformOrigin: "bottom center" }}>
+                <div style={{ animation: "mgSway 6s ease-in-out infinite", transformOrigin: "bottom center" }}>
+                  <TreeDisplay
+                    score={totalCycleScore}
+                    animating={harvestAnimating}
+                    onAnimationComplete={handleHarvestAnimationComplete}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Cycle progress */}
+            <div style={{ background: "#FBF6EC", padding: "12px 16px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ flex: 1, display: "flex", gap: "4px" }}>
+                {dayDots.map((filled, i) => (
+                  <div key={i} style={{ flex: 1, height: "7px", borderRadius: "999px", background: filled ? "#7FB23A" : "#E3D8C2" }} />
+                ))}
+              </div>
+              <span style={{ fontWeight: 700, fontSize: "12.5px", color: "#5A7A33", whiteSpace: "nowrap" }}>{remainingText}</span>
+            </div>
+
+            {/* Harvest button */}
+            {(cycleInfo.phase === "final" || cycleInfo.isOverflow) && (
+              <div style={{ background: "#FBF6EC", padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                {cycleInfo.isOverflow && (
+                  <p style={{ margin: 0, fontSize: "10.5px", fontWeight: 700, color: "#D6A33E", textAlign: "center" }}>収穫期を過ぎています</p>
+                )}
+                <button
+                  onClick={handleHarvest}
+                  disabled={characterLoading}
+                  style={{ fontFamily: FONT, fontWeight: 800, fontSize: "14px", color: "#fff", background: "#5A9E2E", border: "none", borderRadius: "14px", padding: "11px 0", cursor: "pointer", opacity: characterLoading ? 0.5 : 1, boxShadow: "0 4px 12px rgba(90,158,46,.35)", width: "100%" }}
+                >
+                  🍎 収穫する
+                </button>
+              </div>
+            )}
+          </section>
         </div>
 
         {/* Tab bar */}
-        <div className="flex overflow-x-auto border border-zinc-800 bg-zinc-900 scrollbar-none -mx-0">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex-none px-3 py-2.5 font-mono text-xs flex items-center gap-1.5 transition-colors border-r border-zinc-800 last:border-r-0 whitespace-nowrap ${
-                activeTab === tab.key
-                  ? "bg-violet-600 text-white"
-                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
-              }`}
-            >
-              <span className="leading-none">{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
+        <div style={{ flexShrink: 0, background: "#F3ECDD", padding: "10px 16px 0", borderBottom: "1px solid #E4D9C2" }}>
+          <div style={{ display: "flex", gap: "7px", overflowX: "auto", padding: "2px 0 10px", scrollbarWidth: "none" }}>
+            {TABS.map((tab) => {
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "5px", flexShrink: 0, whiteSpace: "nowrap",
+                    fontFamily: FONT, fontWeight: 700, fontSize: "12.5px", cursor: "pointer",
+                    borderRadius: "999px", padding: "8px 14px",
+                    border: isActive ? `1.5px solid ${tab.color}` : "1.5px solid #E2D6BE",
+                    background: isActive ? tab.color : "#FBF6EC",
+                    color: isActive ? "#fff" : "#7A6A53",
+                    boxShadow: isActive ? `0 3px 8px ${tab.color}55` : "none",
+                  }}
+                >
+                  <span style={{ fontSize: "13px" }}>{tab.icon}</span>
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Task list */}
-        <TaskList
-          tasks={filteredTasks}
-          checkedTaskIds={checkedTaskIds}
-          pendingTaskIds={pendingTaskIds}
-          onToggle={handleToggle}
-          loading={logsLoading}
-          numericValues={numericValues}
-          onNumericSubmit={handleNumericSubmit}
-          onNumericClear={handleNumericClear}
-          recentLogs={recentLogs}
-          today={effectiveToday}
-          cycleStartDate={cycleStartDate}
-          isFavorite={isFavorite}
-          toggleFavorite={toggleFavorite}
-          isRoutineTab={activeTab === 'routine'}
-          journals={journals}
-          onJournalSave={handleJournalSave}
-          onJournalDelete={handleJournalDelete}
-        />
-      </main>
+        {/* Scrollable content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px 40px", display: "flex", flexDirection: "column", gap: "14px", scrollbarWidth: "none" }}>
+
+          <TaskList
+            tasks={filteredTasks}
+            checkedTaskIds={checkedTaskIds}
+            pendingTaskIds={pendingTaskIds}
+            onToggle={handleToggle}
+            loading={logsLoading}
+            numericValues={numericValues}
+            onNumericSubmit={handleNumericSubmit}
+            onNumericClear={handleNumericClear}
+            recentLogs={recentLogs}
+            today={effectiveToday}
+            cycleStartDate={cycleStartDate}
+            isFavorite={isFavorite}
+            toggleFavorite={toggleFavorite}
+            isRoutineTab={activeTab === "routine"}
+            journals={journals}
+            onJournalSave={handleJournalSave}
+            onJournalDelete={handleJournalDelete}
+          />
+
+          {/* Journal shortcut card */}
+          <section style={{ background: "linear-gradient(135deg, #F6EAD3, #F1E7CF)", border: "1px solid #E6D8B8", borderRadius: "20px", padding: "15px 17px", display: "flex", alignItems: "center", gap: "13px" }}>
+            <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "23px", flexShrink: 0, boxShadow: "0 2px 6px rgba(90,70,35,.1)" }}>📔</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontWeight: 800, fontSize: "14px", color: "#6E4A2A" }}>
+                {morningJournal ? "今日のジャーナル ✓" : "きょうの3行ジャーナル"}
+              </p>
+              <p style={{ margin: "2px 0 0", fontSize: "11.5px", color: "#A8987F", lineHeight: 1.35 }}>
+                {morningJournal
+                  ? morningJournal.text?.slice(0, 36) || "記録済み"
+                  : "気づきを書くと精神カテゴリが伸びます"}
+              </p>
+            </div>
+            <button
+              onClick={() => setJournalModalSlot("morning")}
+              style={{ fontFamily: FONT, fontWeight: 800, fontSize: "13px", color: "#fff", background: "#9B6BB0", border: "none", borderRadius: "12px", padding: "9px 15px", cursor: "pointer", flexShrink: 0, boxShadow: "0 3px 8px rgba(155,107,176,.3)" }}
+            >
+              {morningJournal ? "編集" : "書く"}
+            </button>
+          </section>
+
+          {/* Test tools */}
+          <section style={{ border: "1.5px dashed #D8C9AC", borderRadius: "16px", padding: "9px 11px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "10px", fontWeight: 800, color: "#B6A485", letterSpacing: ".08em", whiteSpace: "nowrap" }}>TEST</span>
+            <div style={{ display: "flex", gap: "6px", flex: 1 }}>
+              <button onClick={handleAdvanceDay} style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: "#7A6A53", background: "#F1EAD9", border: "1px solid #E0D4BD", borderRadius: "10px", padding: "7px 4px", cursor: "pointer" }}>＋1日</button>
+              <button onClick={handleResetDate} style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: "#7A6A53", background: "#F1EAD9", border: "1px solid #E0D4BD", borderRadius: "10px", padding: "7px 4px", cursor: "pointer" }}>リセット</button>
+              <button onClick={handlePurgeAllData} style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: "#C75B4A", background: "#FAF0EE", border: "1px solid #E8C8C2", borderRadius: "10px", padding: "7px 4px", cursor: "pointer" }}>全消去</button>
+            </div>
+          </section>
+
+        </div>
+
+        {/* Balance popup */}
+        {showBalance && (
+          <div
+            onClick={() => setShowBalance(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(50,38,18,.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: "390px", maxWidth: "100%", background: "#F7F0E1", borderRadius: "26px 26px 0 0", padding: "8px 18px 26px", boxShadow: "0 -16px 50px rgba(50,35,15,.3)", display: "flex", flexDirection: "column", gap: "15px", fontFamily: FONT }}
+            >
+              <div style={{ display: "flex", justifyContent: "center", padding: "6px 0 2px" }}>
+                <div style={{ width: "40px", height: "5px", borderRadius: "999px", background: "#DDD0B8" }} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontWeight: 800, fontSize: "16px", color: "#6E4A2A" }}>サイクルのバランス</span>
+                <button
+                  onClick={() => setShowBalance(false)}
+                  style={{ width: "30px", height: "30px", borderRadius: "50%", border: "none", background: "#EAE0CC", color: "#7A6A53", fontSize: "14px", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                >
+                  ✕
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "13px" }}>
+                {Object.entries(CAT_META).map(([catId, meta]) => {
+                  const color = CAT_COLORS[catId] ?? "#999";
+                  const score = cycleScores[catId as Category] ?? 0;
+                  const pct = Math.min(100, Math.round(score / 2));
+                  return (
+                    <div key={catId} style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                        <span style={{ fontSize: "14px" }}>{meta.icon}</span>
+                        <span style={{ fontWeight: 700, fontSize: "12.5px", color: "#5C5040" }}>{meta.name}</span>
+                        <span style={{ marginLeft: "auto", fontWeight: 700, fontSize: "12px", color: "#A8987F" }}>{score}pt</span>
+                      </div>
+                      <div style={{ height: "9px", borderRadius: "999px", background: "#EDE4D1", overflow: "hidden" }}>
+                        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: "999px", transition: "width .35s ease" }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Page-level journal modal (for journal shortcut card) */}
+        {journalModalTask && journalModalSlot && (
+          <JournalModal
+            task={journalModalTask}
+            slot={journalModalSlot}
+            existing={journals[journalModalSlot] ?? null}
+            onSave={handleJournalSave}
+            onDelete={handleJournalDelete}
+            onClose={() => setJournalModalSlot(null)}
+          />
+        )}
+
+      </div>
     </div>
   );
 }
