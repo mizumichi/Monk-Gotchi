@@ -266,9 +266,8 @@ export default function DashboardPage() {
   }
 
   const checkedTaskIds = new Set(dailyLogs.map((log) => log.taskId));
-  const daysLeft = Math.max(0, 7 - cycleInfo.dayN);
   const dayDots = Array.from({ length: 7 }, (_, i) => i < cycleInfo.dayN);
-  const remainingText = daysLeft > 0 ? `あと${daysLeft}日` : "収穫の日！";
+  const dayText = cycleInfo.dayN <= 7 ? `${cycleInfo.dayN}日目 / 7日` : "収穫の日！";
   const morningJournal = journals["morning"];
 
   const journalModalTask = journalModalSlot === "morning"
@@ -301,7 +300,7 @@ export default function DashboardPage() {
             </div>
           )}
           <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 12px", background: "#F3ECDD", borderBottom: "1px solid #E4D9C2" }}>
-            <span style={{ fontWeight: 800, fontSize: "15px", letterSpacing: ".08em", color: "#6E4A2A", whiteSpace: "nowrap" }}>MONK·GOTCHI</span>
+            <span style={{ fontWeight: 800, fontSize: "15px", letterSpacing: ".08em", color: "#6E4A2A", whiteSpace: "nowrap" }}>HI-T-TREE</span>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <Link
                 href="/orchard"
@@ -345,14 +344,12 @@ export default function DashboardPage() {
                 <span style={{ fontSize: "11px", color: "#A8987F" }}>pt</span>
               </div>
               {/* Tree */}
-              <div style={{ marginBottom: "-6px", animation: "mgFloat 5s ease-in-out infinite", transformOrigin: "bottom center" }}>
-                <div style={{ animation: "mgSway 6s ease-in-out infinite", transformOrigin: "bottom center" }}>
-                  <TreeDisplay
-                    score={totalCycleScore}
-                    animating={harvestAnimating}
-                    onAnimationComplete={handleHarvestAnimationComplete}
-                  />
-                </div>
+              <div style={{ marginBottom: "-6px", transformOrigin: "bottom center" }}>
+                <TreeDisplay
+                  score={totalCycleScore}
+                  animating={harvestAnimating}
+                  onAnimationComplete={handleHarvestAnimationComplete}
+                />
               </div>
             </div>
 
@@ -363,7 +360,7 @@ export default function DashboardPage() {
                   <div key={i} style={{ flex: 1, height: "7px", borderRadius: "999px", background: filled ? "#7FB23A" : "#E3D8C2" }} />
                 ))}
               </div>
-              <span style={{ fontWeight: 700, fontSize: "12.5px", color: "#5A7A33", whiteSpace: "nowrap" }}>{remainingText}</span>
+              <span style={{ fontWeight: 700, fontSize: "12.5px", color: "#5A7A33", whiteSpace: "nowrap" }}>{dayText}</span>
             </div>
 
             {/* Harvest button */}
@@ -467,19 +464,16 @@ export default function DashboardPage() {
 
         </div>
 
-        {/* Balance popup */}
+        {/* Balance popup (top sheet) */}
         {showBalance && (
           <div
             onClick={() => setShowBalance(false)}
-            style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(50,38,18,.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+            style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(50,38,18,.45)", display: "flex", alignItems: "flex-start", justifyContent: "center" }}
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              style={{ width: "390px", maxWidth: "100%", background: "#F7F0E1", borderRadius: "26px 26px 0 0", padding: "8px 18px 26px", boxShadow: "0 -16px 50px rgba(50,35,15,.3)", display: "flex", flexDirection: "column", gap: "15px", fontFamily: FONT }}
+              style={{ width: "390px", maxWidth: "100%", background: "#F7F0E1", borderRadius: "0 0 26px 26px", padding: "16px 18px 24px", boxShadow: "0 16px 50px rgba(50,35,15,.3)", display: "flex", flexDirection: "column", gap: "15px", fontFamily: FONT }}
             >
-              <div style={{ display: "flex", justifyContent: "center", padding: "6px 0 2px" }}>
-                <div style={{ width: "40px", height: "5px", borderRadius: "999px", background: "#DDD0B8" }} />
-              </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontWeight: 800, fontSize: "16px", color: "#6E4A2A" }}>サイクルのバランス</span>
                 <button

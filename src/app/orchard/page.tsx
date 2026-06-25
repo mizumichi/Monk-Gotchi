@@ -10,10 +10,24 @@ import type { Schema } from "../../../amplify/data/resource";
 
 type HarvestEntry = Schema["Harvest"]["type"];
 
+const FONT = "'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif";
+
+const RANK_LABEL: Record<string, string> = {
+  low: "いまいち",
+  mid: "普通",
+  high: "だいぶ良い",
+};
+
+const RANK_COLOR: Record<string, string> = {
+  low: "#C07A6A",
+  mid: "#C58A2A",
+  high: "#5A7A33",
+};
+
 function formatHarvestedAt(iso: string): string {
   const d = new Date(iso);
   const jst = new Date(d.getTime() + 9 * 3600 * 1000);
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`;
+  return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`;
 }
 
 export default function OrchardPage() {
@@ -34,7 +48,7 @@ export default function OrchardPage() {
         const { data } = await client.models.Harvest.list();
         setHarvests(
           (data ?? []).sort((a, b) =>
-            (b.harvestedAt ?? '').localeCompare(a.harvestedAt ?? '')
+            (b.harvestedAt ?? "").localeCompare(a.harvestedAt ?? "")
           )
         );
       } catch (err) {
@@ -49,70 +63,73 @@ export default function OrchardPage() {
   const totalFruits = harvests.reduce((sum, h) => sum + (h.fruitCount ?? 0), 0);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
-        <span className="font-mono font-bold text-violet-400 tracking-widest text-sm">
-          🌳 果樹園
-        </span>
-        <Link
-          href="/dashboard"
-          className="font-mono text-xs text-zinc-400 hover:text-zinc-100 border border-zinc-700 hover:border-zinc-500 px-3 py-1.5 transition-colors"
-        >
-          ホーム
-        </Link>
-      </header>
+    <div style={{ minHeight: "100vh", background: "#E7DECB", display: "flex", justifyContent: "center", fontFamily: FONT }}>
+      <div style={{ width: "390px", maxWidth: "100%", minHeight: "100vh", background: "#F3ECDD", boxShadow: "0 0 60px rgba(80,60,30,.15)", display: "flex", flexDirection: "column" }}>
 
-      <main className="max-w-lg mx-auto px-4 py-5 flex flex-col gap-5">
-        {/* Summary */}
-        <div className="flex gap-6 justify-center py-4 border border-zinc-800 bg-zinc-900">
-          <div className="text-center">
-            <p className="font-mono text-[10px] text-zinc-500 tracking-widest">果樹園の実</p>
-            <p className="font-mono text-3xl font-bold text-emerald-400">{totalFruits}</p>
-            <p className="font-mono text-[10px] text-zinc-400">個</p>
-          </div>
-          <div className="w-px bg-zinc-800" />
-          <div className="text-center">
-            <p className="font-mono text-[10px] text-zinc-500 tracking-widest">収穫回数</p>
-            <p className="font-mono text-3xl font-bold text-violet-400">{harvests.length}</p>
-            <p className="font-mono text-[10px] text-zinc-400">回</p>
-          </div>
-        </div>
-
-        {/* Card grid */}
-        {loading ? (
-          <p className="font-mono text-xs text-zinc-500 animate-pulse py-6 text-center tracking-widest">
-            LOADING...
-          </p>
-        ) : harvests.length === 0 ? (
-          <p className="font-mono text-xs text-zinc-600 py-6 text-center">
-            まだ収穫がありません
-          </p>
-        ) : (
-          <div
-            className="grid gap-3"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}
+        {/* Header */}
+        <header style={{ position: "sticky", top: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 12px", background: "#F3ECDD", borderBottom: "1px solid #E4D9C2" }}>
+          <span style={{ fontWeight: 800, fontSize: "15px", letterSpacing: ".08em", color: "#6E4A2A" }}>🧺 果樹園</span>
+          <Link
+            href="/dashboard"
+            style={{ display: "flex", alignItems: "center", gap: "4px", fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", color: "#5A7A33", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "999px", padding: "6px 12px", textDecoration: "none", whiteSpace: "nowrap" }}
           >
-            {harvests.map((h) => (
-              <div
-                key={h.id}
-                className="border border-zinc-800 bg-zinc-900 p-2 flex flex-col items-center"
-              >
-                <CrateDisplay fruitCount={h.fruitCount ?? 0} />
-                <p className="font-mono text-xs text-zinc-200 mt-1">
-                  {formatHarvestedAt(h.harvestedAt ?? '')}
-                </p>
-                <p className="font-mono text-[10px] text-zinc-500">
-                  {h.totalScore ?? 0} pt
-                </p>
-                <p className="font-mono text-[10px] text-zinc-400">
-                  🍎 {h.fruitCount} 個
-                </p>
-              </div>
-            ))}
+            ← ダッシュボードへ
+          </Link>
+        </header>
+
+        <main style={{ flex: 1, padding: "16px 16px 40px", display: "flex", flexDirection: "column", gap: "14px" }}>
+
+          {/* Summary */}
+          <div style={{ display: "flex", gap: "0", background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "20px", overflow: "hidden", boxShadow: "0 4px 14px rgba(90,70,35,.08)" }}>
+            <div style={{ flex: 1, padding: "18px 16px", textAlign: "center" }}>
+              <p style={{ margin: "0 0 4px", fontSize: "10.5px", fontWeight: 700, color: "#A8987F", letterSpacing: ".06em" }}>果樹園の実</p>
+              <p style={{ margin: 0, fontSize: "36px", fontWeight: 800, color: "#5A9E2E", lineHeight: 1 }}>{totalFruits}</p>
+              <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#A8987F" }}>個</p>
+            </div>
+            <div style={{ width: "1px", background: "#E6DBC4", margin: "14px 0" }} />
+            <div style={{ flex: 1, padding: "18px 16px", textAlign: "center" }}>
+              <p style={{ margin: "0 0 4px", fontSize: "10.5px", fontWeight: 700, color: "#A8987F", letterSpacing: ".06em" }}>収穫回数</p>
+              <p style={{ margin: 0, fontSize: "36px", fontWeight: 800, color: "#C77B4A", lineHeight: 1 }}>{harvests.length}</p>
+              <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#A8987F" }}>回</p>
+            </div>
           </div>
-        )}
-      </main>
+
+          {/* Card grid */}
+          {loading ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+              <p style={{ fontSize: "12px", fontWeight: 700, color: "#B6A485" }}>読み込み中...</p>
+            </div>
+          ) : harvests.length === 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: "40px", marginBottom: "12px" }}>🧺</div>
+              <p style={{ margin: 0, fontWeight: 800, fontSize: "14px", color: "#6E4A2A" }}>まだ収穫がありません</p>
+              <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#A8987F" }}>7日間頑張ったら最初の実がなります</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
+              {harvests.map((h) => (
+                <div
+                  key={h.id}
+                  style={{ background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "18px", padding: "12px 12px 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", boxShadow: "0 2px 8px rgba(90,70,35,.06)" }}
+                >
+                  <CrateDisplay fruitCount={h.fruitCount ?? 0} />
+                  <p style={{ margin: 0, fontSize: "12px", fontWeight: 700, color: "#43382A" }}>
+                    {formatHarvestedAt(h.harvestedAt ?? "")}
+                  </p>
+                  <p style={{ margin: 0, fontSize: "11px", fontWeight: 800, color: RANK_COLOR[h.rank ?? "mid"] ?? "#A8987F" }}>
+                    {RANK_LABEL[h.rank ?? "mid"] ?? h.rank}
+                  </p>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <span style={{ fontSize: "10.5px", color: "#A8987F" }}>{h.totalScore ?? 0}pt</span>
+                    <span style={{ fontSize: "10.5px", color: "#5A9E2E", fontWeight: 700 }}>🍎 {h.fruitCount}個</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+        </main>
+      </div>
     </div>
   );
 }
