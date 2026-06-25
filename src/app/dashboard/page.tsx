@@ -522,14 +522,15 @@ export default function DashboardPage() {
                   <span style={{ fontWeight: 700, fontSize: "11px", color: "#9A8B76" }}>フレンド</span>
                   <span style={{ fontSize: "9px", color: "#B0A090", fontWeight: 600 }}>近日公開</span>
                 </div>
-                {/* ジャーナル（近日公開） */}
-                <div
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "14px 8px", background: "#F0EDE6", border: "1.5px solid #DDD6C6", borderRadius: "16px", opacity: 0.5 }}
+                {/* ジャーナル */}
+                <Link
+                  href="/journal/review"
+                  onClick={() => setShowMenu(false)}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "14px 8px", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "16px", textDecoration: "none", cursor: "pointer" }}
                 >
                   <span style={{ fontSize: "28px" }}>📓</span>
-                  <span style={{ fontWeight: 700, fontSize: "11px", color: "#9A8B76" }}>ジャーナル</span>
-                  <span style={{ fontSize: "9px", color: "#B0A090", fontWeight: 600 }}>近日公開</span>
-                </div>
+                  <span style={{ fontWeight: 700, fontSize: "11px", color: "#5A7A33" }}>ジャーナル</span>
+                </Link>
               </div>
             </div>
           </div>
