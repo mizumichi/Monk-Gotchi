@@ -45,8 +45,8 @@ function TreeIcon() {
 
 export default function LoginPage() {
   return (
-    <div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", background: "#E7DECB", fontFamily: FONT }}>
-      <div style={{ width: "390px", maxWidth: "100%", minHeight: "100vh", background: "#F3ECDD", boxShadow: "0 0 60px rgba(80,60,30,.15)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 24px" }}>
+    <div style={{ minHeight: "100vh", background: "#E7DECB", fontFamily: FONT }}>
+      <div style={{ width: "390px", maxWidth: "100%", minHeight: "100vh", margin: "0 auto", background: "#F3ECDD", boxShadow: "0 0 60px rgba(80,60,30,.15)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 0", overflowX: "hidden" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "32px", gap: "10px" }}>
           <div style={{ background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "24px", width: "96px", height: "96px", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 16px rgba(90,154,46,.15)" }}>
             <TreeIcon />
@@ -57,6 +57,10 @@ export default function LoginPage() {
 
         <style>{`
           [data-amplify-authenticator] {
+            width: 100%;
+            max-width: 100%;
+            --amplify-components-authenticator-router-width: 100%;
+            --amplify-components-authenticator-container-width-max: 100%;
             --amplify-colors-background-primary: #F3ECDD;
             --amplify-colors-background-secondary: #FBF6EC;
             --amplify-colors-border-primary: #E0D4BD;
@@ -72,19 +76,56 @@ export default function LoginPage() {
             --amplify-components-button-primary-hover-background-color: #4A6629;
             --amplify-components-authenticator-router-border-color: #E6DBC4;
             --amplify-components-authenticator-router-background-color: #FBF6EC;
+            --amplify-components-authenticator-max-width: 100%;
             font-family: 'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif;
           }
+          [data-amplify-authenticator] * {
+            box-sizing: border-box;
+          }
+          [data-amplify-authenticator] [data-amplify-container] {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+          }
           [data-amplify-authenticator] [data-amplify-router] {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
             border-radius: 20px;
             border: 1px solid #E6DBC4;
             box-shadow: 0 4px 20px rgba(90,70,35,.08);
             background: #FBF6EC;
+            box-sizing: border-box !important;
+            overflow: hidden;
+          }
+          [data-amplify-authenticator] [data-amplify-form] {
+            padding: 20px 20px 16px !important;
+            box-sizing: border-box !important;
+          }
+          [data-amplify-authenticator] [data-amplify-footer] {
+            padding: 0 20px 20px !important;
+            box-sizing: border-box !important;
+          }
+          [data-amplify-authenticator] .amplify-flex,
+          [data-amplify-authenticator] .amplify-field,
+          [data-amplify-authenticator] .amplify-field-group {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+          }
+          [data-amplify-authenticator] .amplify-field-group__outer-end {
+            flex-shrink: 0;
           }
           [data-amplify-authenticator] input {
+            width: 100% !important;
+            min-width: 0 !important;
             border-radius: 10px !important;
             border-color: #E0D4BD !important;
             background: #fff !important;
             font-family: 'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif !important;
+            box-sizing: border-box !important;
           }
           [data-amplify-authenticator] button[type="submit"] {
             border-radius: 12px !important;
@@ -93,9 +134,11 @@ export default function LoginPage() {
           }
         `}</style>
 
-        <Authenticator loginMechanisms={["email"]}>
-          {({ user }) => <RedirectAfterLogin user={user} />}
-        </Authenticator>
+        <div style={{ width: "100%", padding: "0 24px", boxSizing: "border-box" }}>
+          <Authenticator loginMechanisms={["email"]}>
+            {({ user }) => <RedirectAfterLogin user={user} />}
+          </Authenticator>
+        </div>
       </div>
     </div>
   );
