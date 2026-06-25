@@ -84,6 +84,7 @@ export default function DashboardPage() {
   const harvestScoreRef = useRef(0);
   const [showBalance, setShowBalance] = useState(false);
   const [showHarvestConfirm, setShowHarvestConfirm] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [showTestTools, setShowTestTools] = useState(false);
   const lastSunTapRef = useRef(0);
   const [routineOrder, setRoutineOrder] = useState<string[]>([]);
@@ -338,28 +339,11 @@ export default function DashboardPage() {
           <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 12px", background: "#F3ECDD", borderBottom: "1px solid #E4D9C2" }}>
             <span style={{ fontWeight: 800, fontSize: "15px", letterSpacing: ".08em", color: "#6E4A2A", whiteSpace: "nowrap" }}>HI-T-TREE</span>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <Link
-                href="/orchard"
-                style={{ display: "flex", alignItems: "center", gap: "4px", fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", color: "#5A7A33", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "999px", padding: "6px 11px", textDecoration: "none", whiteSpace: "nowrap" }}
-              >
-                <span>🧺</span>果樹園
-              </Link>
               <button
-                onClick={() => setShowBalance(true)}
-                style={{ display: "flex", alignItems: "center", gap: "4px", fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", color: "#5A7A33", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "999px", padding: "6px 11px", cursor: "pointer", whiteSpace: "nowrap" }}
+                onClick={() => setShowMenu(true)}
+                style={{ display: "flex", alignItems: "center", gap: "4px", fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", color: "#5A7A33", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "999px", padding: "6px 13px", cursor: "pointer", whiteSpace: "nowrap" }}
               >
-                <span>📊</span>バランス
-              </button>
-              <button
-                onClick={signOut}
-                title="サインアウト"
-                style={{ color: "#9A8B76", background: "#EFE7D6", border: "1.5px solid #E0D4BD", borderRadius: "50%", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" stroke="#9A8B76" strokeWidth="1.6" strokeLinecap="round" />
-                  <path d="M10 11l3-3-3-3" stroke="#9A8B76" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M13 8H6" stroke="#9A8B76" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
+                <span>≡</span>その他
               </button>
             </div>
           </header>
@@ -484,6 +468,72 @@ export default function DashboardPage() {
           )}
 
         </div>
+
+        {/* その他メニュー */}
+        {showMenu && (
+          <div
+            onClick={() => setShowMenu(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(50,38,18,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: "100%", maxWidth: "320px", background: "#F7F0E1", borderRadius: "24px", padding: "20px 20px 24px", boxShadow: "0 20px 60px rgba(50,35,15,.4)", fontFamily: FONT }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+                <span style={{ fontWeight: 800, fontSize: "16px", color: "#6E4A2A" }}>その他</span>
+                <button
+                  onClick={() => setShowMenu(false)}
+                  style={{ width: "30px", height: "30px", borderRadius: "50%", border: "none", background: "#EAE0CC", color: "#7A6A53", fontSize: "14px", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  ✕
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+                {/* 果樹園 */}
+                <Link
+                  href="/orchard"
+                  onClick={() => setShowMenu(false)}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "14px 8px", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "16px", textDecoration: "none", cursor: "pointer" }}
+                >
+                  <span style={{ fontSize: "28px" }}>🧺</span>
+                  <span style={{ fontWeight: 700, fontSize: "11px", color: "#5A7A33" }}>果樹園</span>
+                </Link>
+                {/* バランス */}
+                <button
+                  onClick={() => { setShowMenu(false); setShowBalance(true); }}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "14px 8px", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "16px", cursor: "pointer", fontFamily: FONT }}
+                >
+                  <span style={{ fontSize: "28px" }}>📊</span>
+                  <span style={{ fontWeight: 700, fontSize: "11px", color: "#5A7A33" }}>バランス</span>
+                </button>
+                {/* ログアウト */}
+                <button
+                  onClick={() => { setShowMenu(false); signOut(); }}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "14px 8px", background: "#FBF0EE", border: "1.5px solid #E8C8C2", borderRadius: "16px", cursor: "pointer", fontFamily: FONT }}
+                >
+                  <span style={{ fontSize: "28px" }}>🚪</span>
+                  <span style={{ fontWeight: 700, fontSize: "11px", color: "#C75B4A" }}>ログアウト</span>
+                </button>
+                {/* フレンド（近日公開） */}
+                <div
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "14px 8px", background: "#F0EDE6", border: "1.5px solid #DDD6C6", borderRadius: "16px", opacity: 0.5 }}
+                >
+                  <span style={{ fontSize: "28px" }}>👥</span>
+                  <span style={{ fontWeight: 700, fontSize: "11px", color: "#9A8B76" }}>フレンド</span>
+                  <span style={{ fontSize: "9px", color: "#B0A090", fontWeight: 600 }}>近日公開</span>
+                </div>
+                {/* ジャーナル（近日公開） */}
+                <div
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "14px 8px", background: "#F0EDE6", border: "1.5px solid #DDD6C6", borderRadius: "16px", opacity: 0.5 }}
+                >
+                  <span style={{ fontSize: "28px" }}>📓</span>
+                  <span style={{ fontWeight: 700, fontSize: "11px", color: "#9A8B76" }}>ジャーナル</span>
+                  <span style={{ fontSize: "9px", color: "#B0A090", fontWeight: 600 }}>近日公開</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Balance popup (top sheet) */}
         {showBalance && (
