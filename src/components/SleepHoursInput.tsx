@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { CATEGORY_META, type Task } from "@/data/tasks";
 import { calcSleepHoursXp, getSleepHoursLabel } from "@/lib/sleepXp";
 
@@ -24,6 +25,7 @@ interface Props {
   onClear: (taskId: string) => void;
   onOpenDetail: () => void;
   onToggleFavorite: () => void;
+  dragHandle?: React.ReactNode;
 }
 
 export default function SleepHoursInput({
@@ -35,6 +37,7 @@ export default function SleepHoursInput({
   onClear,
   onOpenDetail,
   onToggleFavorite,
+  dragHandle,
 }: Props) {
   const catMeta = CATEGORY_META[task.category];
   const subCatMeta = task.subCategory ? CATEGORY_META[task.subCategory] : undefined;
@@ -51,6 +54,7 @@ export default function SleepHoursInput({
     <div style={{ display: "flex", alignItems: "stretch", gap: 0, background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "16px", overflow: "hidden", boxShadow: "0 2px 6px rgba(90,70,35,.05)", fontFamily: FONT }}>
       {/* Left accent */}
       <div style={{ width: "5px", flexShrink: 0, background: CAT_COLOR }} />
+      {dragHandle ?? null}
 
       <div style={{ display: "flex", alignItems: "flex-start", gap: "11px", padding: "12px 12px 12px 13px", flex: 1, minWidth: 0 }}>
         {/* Icon + star column */}

@@ -63,8 +63,8 @@ export default function OrchardPage() {
   const totalFruits = harvests.reduce((sum, h) => sum + (h.fruitCount ?? 0), 0);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#E7DECB", display: "flex", justifyContent: "center", fontFamily: FONT }}>
-      <div style={{ width: "390px", maxWidth: "100%", minHeight: "100vh", background: "#F3ECDD", boxShadow: "0 0 60px rgba(80,60,30,.15)", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: "#E7DECB", fontFamily: FONT }}>
+      <div style={{ width: "390px", maxWidth: "100%", minHeight: "100vh", margin: "0 auto", background: "#F3ECDD", boxShadow: "0 0 60px rgba(80,60,30,.15)", display: "flex", flexDirection: "column" }}>
 
         {/* Header */}
         <header style={{ position: "sticky", top: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 12px", background: "#F3ECDD", borderBottom: "1px solid #E4D9C2" }}>

@@ -17,21 +17,6 @@ import type { Schema } from "../../amplify/data/resource";
 type Character = Schema["Character"]["type"];
 type AmplifyDailyLog = Schema["DailyLog"]["type"];
 
-export type FruitType = 'apple' | 'peach' | 'mikan';
-
-const FRUIT_TYPES: FruitType[] = ['apple', 'peach', 'mikan'];
-
-function pickNextFruitType(current: FruitType): FruitType {
-  const others = FRUIT_TYPES.filter(t => t !== current);
-  return others[Math.floor(Math.random() * others.length)];
-}
-
-function loadFruitType(): FruitType {
-  if (typeof window === 'undefined') return 'apple';
-  const v = localStorage.getItem('fruitType');
-  return (v === 'apple' || v === 'peach' || v === 'mikan') ? v : 'apple';
-}
-
 export interface HarvestResult {
   success: boolean;
 }
@@ -43,7 +28,6 @@ export interface UseCharacterResult {
   isLoading: boolean;
   error: Error | null;
   numericValues: Record<string, number>;
-  fruitType: FruitType;
   refetch: () => Promise<void>;
   advanceDay: () => Promise<void>;
   resetDate: () => Promise<void>;
@@ -58,7 +42,6 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [numericValues, setNumericValues] = useState<Record<string, number>>({});
-  const [fruitType, setFruitType] = useState<FruitType>(loadFruitType);
   const [dateOverride, setDateOverrideState] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("dateOverride");
@@ -177,8 +160,6 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
       setNumericValues({});
       setDateOverride(null);
       setDateOverrideState(null);
-      localStorage.removeItem('fruitType');
-      setFruitType('apple');
     } catch (err) {
       console.error('[purgeAllData] error:', err);
     }
@@ -225,17 +206,12 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
       });
       if (updated) setCharacter(updated);
 
-      // advance to a different fruit type for the next cycle
-      const next = pickNextFruitType(fruitType);
-      localStorage.setItem('fruitType', next);
-      setFruitType(next);
-
       return { success: true };
     } catch (err) {
       console.error("[harvest] error:", err);
       return { success: false };
     }
-  }, [character, fruitType]);
+  }, [character]);
 
   const submitNumericValue = useCallback(async (taskId: string, value: number) => {
     try {
@@ -302,7 +278,6 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
     isLoading,
     error,
     numericValues,
-    fruitType,
     refetch: fetchOrCreate,
     advanceDay,
     resetDate,

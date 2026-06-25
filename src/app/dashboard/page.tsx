@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentUser } from "aws-amplify/auth";
 import TreeDisplay from "@/components/TreeDisplay";
 import TaskList from "@/components/TaskList";
-import JournalModal from "@/components/JournalModal";
 import { useCharacter } from "@/hooks/useCharacter";
 import { useJournal } from "@/hooks/useJournal";
 import { useRecentLogs } from "@/hooks/useRecentLogs";
@@ -15,7 +14,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
 import { buildAggregatesForDays, getTreeRank, type DailyLogLike } from "@/lib/evolution";
-import { TASKS, type Category, type Task, getTaskById } from "@/data/tasks";
+import { TASKS, type Category, type Task } from "@/data/tasks";
 import type { Schema } from "../../../amplify/data/resource";
 
 type DailyLog = Schema["DailyLog"]["type"];
@@ -76,6 +75,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("routine");
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [pendingTaskIds, setPendingTaskIds] = useState<Set<string>>(new Set());
   const [logsTrigger, setLogsTrigger] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -83,12 +83,36 @@ export default function DashboardPage() {
   const [harvestAnimating, setHarvestAnimating] = useState(false);
   const harvestScoreRef = useRef(0);
   const [showBalance, setShowBalance] = useState(false);
-  const [journalModalSlot, setJournalModalSlot] = useState<"morning" | "evening" | null>(null);
+  const [showHarvestConfirm, setShowHarvestConfirm] = useState(false);
+  const [showTestTools, setShowTestTools] = useState(false);
+  const lastSunTapRef = useRef(0);
+  const [routineOrder, setRoutineOrder] = useState<string[]>([]);
 
+  // Load routine order from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("htt_routine_order");
+      if (stored) setRoutineOrder(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
+
+  // Routine tasks: starred tasks (including journal), apply custom order
   const filteredTasks = useMemo(() => {
-    if (activeTab === "routine") return TASKS.filter((t) => favoriteTaskIds.includes(t.id));
+    if (activeTab === "routine") {
+      return TASKS.filter((t) => favoriteTaskIds.includes(t.id));
+    }
     return TASKS.filter((t) => t.category === activeTab);
   }, [activeTab, favoriteTaskIds]);
+
+  const orderedFilteredTasks = useMemo(() => {
+    if (activeTab !== "routine" || routineOrder.length === 0) return filteredTasks;
+    const orderMap = new Map(routineOrder.map((id, i) => [id, i]));
+    return [...filteredTasks].sort((a, b) => {
+      const ai = orderMap.get(a.id) ?? 9999;
+      const bi = orderMap.get(b.id) ?? 9999;
+      return ai - bi;
+    });
+  }, [activeTab, filteredTasks, routineOrder]);
 
   const cycleScores = useMemo<Scores>(() => {
     const agg = buildAggregatesForDays(fullLogs as DailyLogLike[], cycleStartDate, cycleInfo.dayN);
@@ -133,10 +157,26 @@ export default function DashboardPage() {
         console.error("DailyLog fetch error:", err);
       } finally {
         setLogsLoading(false);
+        setHasLoadedOnce(true);
       }
     }
     load();
   }, [isAuthenticated, logsTrigger]);
+
+  function handleSunDoubleTap() {
+    const now = Date.now();
+    if (now - lastSunTapRef.current < 350) {
+      setShowTestTools((prev) => !prev);
+    }
+    lastSunTapRef.current = now;
+  }
+
+  function handleReorder(newIds: string[]) {
+    setRoutineOrder(newIds);
+    try {
+      localStorage.setItem("htt_routine_order", JSON.stringify(newIds));
+    } catch { /* ignore */ }
+  }
 
   async function handleAdvanceDay() {
     await advanceDay();
@@ -158,9 +198,12 @@ export default function DashboardPage() {
     setLogsTrigger((n) => n + 1);
   }
 
-  async function handleHarvest() {
-    const ok = window.confirm("今サイクルを収穫して、新サイクルを始めますか？");
-    if (!ok) return;
+  function handleHarvest() {
+    setShowHarvestConfirm(true);
+  }
+
+  async function handleHarvestConfirm() {
+    setShowHarvestConfirm(false);
     harvestScoreRef.current = totalCycleScore;
     setHarvestAnimating(true);
   }
@@ -267,18 +310,11 @@ export default function DashboardPage() {
 
   const checkedTaskIds = new Set(dailyLogs.map((log) => log.taskId));
   const dayDots = Array.from({ length: 7 }, (_, i) => i < cycleInfo.dayN);
-  const dayText = cycleInfo.dayN <= 7 ? `${cycleInfo.dayN}日目 / 7日` : "収穫の日！";
-  const morningJournal = journals["morning"];
-
-  const journalModalTask = journalModalSlot === "morning"
-    ? getTaskById("journal_morning")
-    : journalModalSlot === "evening"
-    ? getTaskById("journal_evening")
-    : null;
+  const dayText = `${cycleInfo.dayN}日目`;
 
   return (
-    <div style={{ height: "100vh", display: "flex", justifyContent: "center", background: "#E7DECB", overflow: "hidden", fontFamily: FONT }}>
-      <div style={{ width: "390px", maxWidth: "100%", height: "100%", background: "#F3ECDD", position: "relative", boxShadow: "0 0 60px rgba(80,60,30,.15)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ height: "100vh", background: "#E7DECB", overflow: "hidden", fontFamily: FONT }}>
+      <div style={{ width: "390px", maxWidth: "100%", height: "100%", margin: "0 auto", background: "#F3ECDD", position: "relative", boxShadow: "0 0 60px rgba(80,60,30,.15)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* Click-blocking overlay during harvest animation */}
         {harvestAnimating && (
@@ -333,8 +369,11 @@ export default function DashboardPage() {
         <div style={{ flexShrink: 0, padding: "12px 16px 0" }}>
           <section style={{ borderRadius: "24px", overflow: "hidden", boxShadow: "0 6px 20px rgba(90,70,35,.12)", border: "1px solid #E6DBC4" }}>
             <div style={{ position: "relative", height: "236px", background: `linear-gradient(180deg, ${sky.top}, ${sky.bot})`, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-              {/* Sun/moon */}
-              <div style={{ position: "absolute", top: "22px", right: "30px", width: "46px", height: "46px", borderRadius: "50%", background: sky.orb, boxShadow: `0 0 30px 6px ${sky.glow}` }} />
+              {/* Sun/moon (double-tap to toggle test tools) */}
+              <div
+                onClick={handleSunDoubleTap}
+                style={{ position: "absolute", top: "22px", right: "30px", width: "46px", height: "46px", borderRadius: "50%", background: sky.orb, boxShadow: `0 0 30px 6px ${sky.glow}`, cursor: "pointer" }}
+              />
               {/* Twinkles */}
               <div style={{ position: "absolute", top: "40px", left: "42px", fontSize: "13px", animation: "mgTwinkle 2.6s ease-in-out infinite" }}>✨</div>
               <div style={{ position: "absolute", top: "74px", left: "280px", fontSize: "11px", animation: "mgTwinkle 3.2s ease-in-out .6s infinite" }}>✨</div>
@@ -412,11 +451,11 @@ export default function DashboardPage() {
         <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px 40px", display: "flex", flexDirection: "column", gap: "14px", scrollbarWidth: "none" }}>
 
           <TaskList
-            tasks={filteredTasks}
+            tasks={orderedFilteredTasks}
             checkedTaskIds={checkedTaskIds}
             pendingTaskIds={pendingTaskIds}
             onToggle={handleToggle}
-            loading={logsLoading}
+            loading={logsLoading && !hasLoadedOnce}
             numericValues={numericValues}
             onNumericSubmit={handleNumericSubmit}
             onNumericClear={handleNumericClear}
@@ -429,38 +468,20 @@ export default function DashboardPage() {
             journals={journals}
             onJournalSave={handleJournalSave}
             onJournalDelete={handleJournalDelete}
+            onReorder={activeTab === "routine" ? handleReorder : undefined}
           />
 
-          {/* Journal shortcut card */}
-          <section style={{ background: "linear-gradient(135deg, #F6EAD3, #F1E7CF)", border: "1px solid #E6D8B8", borderRadius: "20px", padding: "15px 17px", display: "flex", alignItems: "center", gap: "13px" }}>
-            <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "23px", flexShrink: 0, boxShadow: "0 2px 6px rgba(90,70,35,.1)" }}>📔</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontWeight: 800, fontSize: "14px", color: "#6E4A2A" }}>
-                {morningJournal ? "今日のジャーナル ✓" : "きょうの3行ジャーナル"}
-              </p>
-              <p style={{ margin: "2px 0 0", fontSize: "11.5px", color: "#A8987F", lineHeight: 1.35 }}>
-                {morningJournal
-                  ? morningJournal.text?.slice(0, 36) || "記録済み"
-                  : "気づきを書くと精神カテゴリが伸びます"}
-              </p>
-            </div>
-            <button
-              onClick={() => setJournalModalSlot("morning")}
-              style={{ fontFamily: FONT, fontWeight: 800, fontSize: "13px", color: "#fff", background: "#9B6BB0", border: "none", borderRadius: "12px", padding: "9px 15px", cursor: "pointer", flexShrink: 0, boxShadow: "0 3px 8px rgba(155,107,176,.3)" }}
-            >
-              {morningJournal ? "編集" : "書く"}
-            </button>
-          </section>
-
-          {/* Test tools */}
-          <section style={{ border: "1.5px dashed #D8C9AC", borderRadius: "16px", padding: "9px 11px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "10px", fontWeight: 800, color: "#B6A485", letterSpacing: ".08em", whiteSpace: "nowrap" }}>TEST</span>
-            <div style={{ display: "flex", gap: "6px", flex: 1 }}>
-              <button onClick={handleAdvanceDay} style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: "#7A6A53", background: "#F1EAD9", border: "1px solid #E0D4BD", borderRadius: "10px", padding: "7px 4px", cursor: "pointer" }}>＋1日</button>
-              <button onClick={handleResetDate} style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: "#7A6A53", background: "#F1EAD9", border: "1px solid #E0D4BD", borderRadius: "10px", padding: "7px 4px", cursor: "pointer" }}>リセット</button>
-              <button onClick={handlePurgeAllData} style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: "#C75B4A", background: "#FAF0EE", border: "1px solid #E8C8C2", borderRadius: "10px", padding: "7px 4px", cursor: "pointer" }}>全消去</button>
-            </div>
-          </section>
+          {/* Test tools (hidden by default, double-tap sun to toggle) */}
+          {showTestTools && (
+            <section style={{ border: "1.5px dashed #D8C9AC", borderRadius: "16px", padding: "9px 11px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "10px", fontWeight: 800, color: "#B6A485", letterSpacing: ".08em", whiteSpace: "nowrap" }}>TEST</span>
+              <div style={{ display: "flex", gap: "6px", flex: 1 }}>
+                <button onClick={handleAdvanceDay} style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: "#7A6A53", background: "#F1EAD9", border: "1px solid #E0D4BD", borderRadius: "10px", padding: "7px 4px", cursor: "pointer" }}>＋1日</button>
+                <button onClick={handleResetDate} style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: "#7A6A53", background: "#F1EAD9", border: "1px solid #E0D4BD", borderRadius: "10px", padding: "7px 4px", cursor: "pointer" }}>リセット</button>
+                <button onClick={handlePurgeAllData} style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "11px", color: "#C75B4A", background: "#FAF0EE", border: "1px solid #E8C8C2", borderRadius: "10px", padding: "7px 4px", cursor: "pointer" }}>全消去</button>
+              </div>
+            </section>
+          )}
 
         </div>
 
@@ -506,16 +527,34 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Page-level journal modal (for journal shortcut card) */}
-        {journalModalTask && journalModalSlot && (
-          <JournalModal
-            task={journalModalTask}
-            slot={journalModalSlot}
-            existing={journals[journalModalSlot] ?? null}
-            onSave={handleJournalSave}
-            onDelete={handleJournalDelete}
-            onClose={() => setJournalModalSlot(null)}
-          />
+        {/* Harvest confirmation dialog */}
+        {showHarvestConfirm && (
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(50,38,18,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", fontFamily: FONT }}
+          >
+            <div style={{ width: "100%", maxWidth: "320px", background: "#F7F0E1", borderRadius: "24px", padding: "28px 22px 22px", boxShadow: "0 20px 60px rgba(50,35,15,.4)", display: "flex", flexDirection: "column", gap: "0" }}>
+              <div style={{ fontSize: "44px", textAlign: "center", marginBottom: "12px" }}>🍎</div>
+              <h2 style={{ margin: "0 0 10px", fontWeight: 800, fontSize: "18px", color: "#6E4A2A", textAlign: "center" }}>新サイクルを始めますか？</h2>
+              <p style={{ margin: "0 0 22px", fontSize: "12.5px", color: "#A8987F", textAlign: "center", lineHeight: 1.6 }}>
+                今サイクルのスコア <strong style={{ color: "#6E4A2A" }}>{totalCycleScore}pt</strong> で収穫します。<br />
+                収穫すると新しい7日間が始まります。
+              </p>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={() => setShowHarvestConfirm(false)}
+                  style={{ flex: 1, fontFamily: FONT, fontWeight: 700, fontSize: "14px", color: "#7A6A53", background: "#EDE4D1", border: "none", borderRadius: "14px", padding: "13px 0", cursor: "pointer" }}
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleHarvestConfirm}
+                  style={{ flex: 1, fontFamily: FONT, fontWeight: 800, fontSize: "14px", color: "#fff", background: "#5A9E2E", border: "none", borderRadius: "14px", padding: "13px 0", cursor: "pointer", boxShadow: "0 4px 12px rgba(90,158,46,.35)" }}
+                >
+                  収穫する 🍎
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
       </div>
