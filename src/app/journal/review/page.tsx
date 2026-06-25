@@ -6,9 +6,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { client } from "@/lib/amplifyClient";
+import { getCurrentDateString } from "@/lib/date";
 import {
+  computeConsecutiveDays,
   computeStats,
   filterByRange,
+  generateSlotsForRange,
+  mergeWithEntries,
   MOOD_LABELS,
   RANGE_DAYS,
   sortEntries,
@@ -24,6 +28,7 @@ type JournalRecord = Schema["Journal"]["type"];
 type TabKey = "graph" | "list";
 
 const FONT = "'M PLUS Rounded 1c', 'Noto Sans JP', system-ui, sans-serif";
+const LIST_PAGE_SIZE = 7;
 
 function fmtDateJa(dateStr: string): string {
   const [y, m, d] = dateStr.split("-");
@@ -38,6 +43,9 @@ export default function JournalReviewPage() {
   const [loading, setLoading] = useState(true);
   const [rangeLabel, setRangeLabel] = useState<RangeLabel>("1週間");
   const [activeTab, setActiveTab] = useState<TabKey>("graph");
+  const [listPage, setListPage] = useState(0);
+
+  const today = useMemo(() => getCurrentDateString(), []);
 
   useEffect(() => {
     if (authStatus === "unauthenticated") router.replace("/login");
@@ -48,8 +56,8 @@ export default function JournalReviewPage() {
     async function load() {
       setLoading(true);
       try {
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 29);
+        const cutoff = new Date(today + "T12:00:00Z");
+        cutoff.setUTCDate(cutoff.getUTCDate() - 29);
         const cutoffStr = cutoff.toISOString().slice(0, 10);
 
         const allData: JournalRecord[] = [];
@@ -81,23 +89,47 @@ export default function JournalReviewPage() {
       }
     }
     load();
-  }, [authStatus]);
+  }, [authStatus, today]);
 
-  const filteredEntries = useMemo(
-    () => filterByRange(allEntries, RANGE_DAYS[rangeLabel]),
-    [allEntries, rangeLabel]
+  // グラフ用: 選択範囲の全スロット（空枠含む）+ エントリ埋め込み
+  const chartSlots = useMemo(
+    () => mergeWithEntries(generateSlotsForRange(RANGE_DAYS[rangeLabel], rangeLabel, today), allEntries),
+    [allEntries, rangeLabel, today],
   );
 
+  // 統計: 選択範囲内のエントリのみ
+  const filteredEntries = useMemo(
+    () => filterByRange(allEntries, RANGE_DAYS[rangeLabel]),
+    [allEntries, rangeLabel],
+  );
   const stats = useMemo(() => computeStats(filteredEntries), [filteredEntries]);
 
-  const entriesByDate = useMemo(() => {
+  // 連続記録日数: 全エントリから計算（範囲問わず）
+  const consecutiveDays = useMemo(
+    () => computeConsecutiveDays(allEntries, today),
+    [allEntries, today],
+  );
+
+  // 一覧: 全エントリを日付でグループ化（新しい順）
+  const allEntriesByDate = useMemo(() => {
     const groups: Record<string, JournalEntry[]> = {};
-    for (const e of filteredEntries) {
+    for (const e of allEntries) {
       if (!groups[e.date]) groups[e.date] = [];
       groups[e.date].push(e);
     }
     return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
-  }, [filteredEntries]);
+  }, [allEntries]);
+
+  const totalListPages = Math.max(1, Math.ceil(allEntriesByDate.length / LIST_PAGE_SIZE));
+  const pagedDateEntries = allEntriesByDate.slice(
+    listPage * LIST_PAGE_SIZE,
+    (listPage + 1) * LIST_PAGE_SIZE,
+  );
+
+  // タブ切り替え時にリストページをリセット
+  useEffect(() => {
+    if (activeTab === "list") setListPage(0);
+  }, [activeTab]);
 
   if (authStatus !== "authenticated") {
     return (
@@ -111,7 +143,7 @@ export default function JournalReviewPage() {
     <div style={{ minHeight: "100vh", background: "#E7DECB", fontFamily: FONT }}>
       <div style={{ width: "390px", maxWidth: "100%", minHeight: "100vh", margin: "0 auto", background: "#F3ECDD", boxShadow: "0 0 60px rgba(80,60,30,.15)", display: "flex", flexDirection: "column" }}>
 
-        {/* Header */}
+        {/* ヘッダー */}
         <header style={{ position: "sticky", top: 0, zIndex: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 12px", background: "#F3ECDD", borderBottom: "1px solid #E4D9C2" }}>
           <div>
             <p style={{ margin: 0, fontWeight: 800, fontSize: "15px", letterSpacing: ".08em", color: "#6E4A2A" }}>📓 ジャーナル</p>
@@ -127,7 +159,7 @@ export default function JournalReviewPage() {
 
         <main style={{ flex: 1, padding: "14px 16px 40px", display: "flex", flexDirection: "column", gap: "14px" }}>
 
-          {/* Stats strip */}
+          {/* 統計ストリップ（選択範囲に連動） */}
           <div style={{ display: "flex", background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "20px", overflow: "hidden", boxShadow: "0 4px 14px rgba(90,70,35,.08)" }}>
             <div style={{ flex: 1, padding: "14px 8px", textAlign: "center" }}>
               <p style={{ margin: "0 0 3px", fontSize: "9.5px", fontWeight: 700, color: "#A8987F", letterSpacing: ".06em" }}>平均気分</p>
@@ -137,9 +169,12 @@ export default function JournalReviewPage() {
             </div>
             <div style={{ width: "1px", background: "#E6DBC4", margin: "12px 0" }} />
             <div style={{ flex: 1, padding: "14px 8px", textAlign: "center" }}>
-              <p style={{ margin: "0 0 3px", fontSize: "9.5px", fontWeight: 700, color: "#A8987F", letterSpacing: ".06em" }}>記録日数</p>
-              <p style={{ margin: 0, fontSize: "26px", fontWeight: 800, color: "#C77B4A", lineHeight: 1 }}>
-                {filteredEntries.length > 0 ? stats.recordedDays : "—"}
+              <p style={{ margin: "0 0 3px", fontSize: "9.5px", fontWeight: 700, color: "#A8987F", letterSpacing: ".06em" }}>連続記録</p>
+              <p style={{ margin: 0, lineHeight: 1 }}>
+                <span style={{ fontSize: "26px", fontWeight: 800, color: "#C77B4A" }}>
+                  {consecutiveDays}
+                </span>
+                <span style={{ fontSize: "11px", color: "#A8987F", marginLeft: "2px" }}>日</span>
               </p>
             </div>
             <div style={{ width: "1px", background: "#E6DBC4", margin: "12px 0" }} />
@@ -151,7 +186,7 @@ export default function JournalReviewPage() {
             </div>
           </div>
 
-          {/* Tab bar */}
+          {/* タブバー */}
           <div style={{ display: "flex", gap: "7px" }}>
             {([["graph", "📈 グラフ"], ["list", "📋 一覧"]] as const).map(([key, label]) => {
               const isActive = activeTab === key;
@@ -174,78 +209,109 @@ export default function JournalReviewPage() {
             })}
           </div>
 
-          {/* Content */}
+          {/* コンテンツ */}
           {loading ? (
             <div style={{ display: "flex", justifyContent: "center", padding: "48px 0" }}>
               <p style={{ fontSize: "12px", fontWeight: 700, color: "#B6A485" }}>読み込み中...</p>
             </div>
           ) : activeTab === "graph" ? (
             <JournalChart
-              entries={filteredEntries}
+              slots={chartSlots}
               rangeLabel={rangeLabel}
               onRangeChange={setRangeLabel}
             />
           ) : (
-            /* List tab */
+            /* 一覧タブ */
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
 
-              {/* Range selector */}
-              <div style={{ display: "flex", gap: "6px", justifyContent: "center" }}>
-                {(["1週間", "2週間", "1ヶ月"] as RangeLabel[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setRangeLabel(r)}
-                    style={{
-                      fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", cursor: "pointer",
-                      borderRadius: "999px", padding: "5px 13px",
-                      border: rangeLabel === r ? "1.5px solid #7FB23A" : "1.5px solid #E2D6BE",
-                      background: rangeLabel === r ? "#7FB23A" : "#FBF6EC",
-                      color: rangeLabel === r ? "#fff" : "#7A6A53",
-                    }}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-
-              {entriesByDate.length === 0 ? (
+              {allEntriesByDate.length === 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "48px 24px", textAlign: "center" }}>
                   <div style={{ fontSize: "40px", marginBottom: "12px" }}>📓</div>
                   <p style={{ margin: 0, fontWeight: 800, fontSize: "14px", color: "#6E4A2A" }}>まだ記録がありません</p>
                   <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#A8987F" }}>ダッシュボードから朝・夜のジャーナルを記録しましょう</p>
                 </div>
               ) : (
-                entriesByDate.map(([date, dayEntries]) => (
-                  <div key={date} style={{ background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "18px", overflow: "hidden", boxShadow: "0 2px 8px rgba(90,70,35,.06)" }}>
-                    <div style={{ padding: "10px 14px", borderBottom: "1px solid #E6DBC4", background: "#F3ECDD" }}>
-                      <p style={{ margin: 0, fontWeight: 800, fontSize: "12px", color: "#6E4A2A" }}>{fmtDateJa(date)}</p>
-                    </div>
-                    {dayEntries.map((e, i) => (
-                      <div
-                        key={e.id}
-                        style={{ padding: "12px 14px", borderBottom: i < dayEntries.length - 1 ? "1px solid #EDE4D1" : "none" }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: e.text ? "6px" : 0 }}>
-                          <span style={{ fontSize: "16px" }}>{e.slot === "morning" ? "🌅" : "🌙"}</span>
-                          <span style={{ fontWeight: 700, fontSize: "11.5px", color: "#7A6A53" }}>
-                            {e.slot === "morning" ? "朝" : "夜"}
-                          </span>
-                          <span style={{ marginLeft: "auto", fontWeight: 800, fontSize: "18px", color: e.slot === "morning" ? "#93C46F" : "#5A7A33", lineHeight: 1 }}>
-                            {e.mood}
-                          </span>
-                          <span style={{ fontSize: "10.5px", color: "#A8987F", minWidth: "52px", textAlign: "right" }}>
-                            {MOOD_LABELS[e.mood]}
-                          </span>
-                        </div>
-                        {e.text && (
-                          <p style={{ margin: 0, fontSize: "12px", color: "#5C5040", lineHeight: 1.65, paddingLeft: "24px", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                            {e.text}
-                          </p>
-                        )}
+                <>
+                  {/* 日付ごとカード */}
+                  {pagedDateEntries.map(([date, dayEntries]) => (
+                    <div key={date} style={{ background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "18px", overflow: "hidden", boxShadow: "0 2px 8px rgba(90,70,35,.06)" }}>
+                      <div style={{ padding: "10px 14px", borderBottom: "1px solid #E6DBC4", background: "#F3ECDD" }}>
+                        <p style={{ margin: 0, fontWeight: 800, fontSize: "12px", color: "#6E4A2A" }}>{fmtDateJa(date)}</p>
                       </div>
-                    ))}
-                  </div>
-                ))
+                      {dayEntries.map((e, i) => (
+                        <div
+                          key={e.id}
+                          style={{ padding: "12px 14px", borderBottom: i < dayEntries.length - 1 ? "1px solid #EDE4D1" : "none" }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: e.text ? "6px" : 0 }}>
+                            <span style={{ fontSize: "16px" }}>{e.slot === "morning" ? "🌅" : "🌙"}</span>
+                            <span style={{ fontWeight: 700, fontSize: "11.5px", color: "#7A6A53" }}>
+                              {e.slot === "morning" ? "朝" : "夜"}
+                            </span>
+                            <span style={{ marginLeft: "auto", fontWeight: 800, fontSize: "18px", color: e.slot === "morning" ? "#93C46F" : "#5A7A33", lineHeight: 1 }}>
+                              {e.mood}
+                            </span>
+                            <span style={{ fontSize: "10.5px", color: "#A8987F", minWidth: "52px", textAlign: "right" }}>
+                              {MOOD_LABELS[e.mood]}
+                            </span>
+                          </div>
+                          {e.text && (
+                            <p style={{ margin: 0, fontSize: "12px", color: "#5C5040", lineHeight: 1.65, paddingLeft: "24px", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                              {e.text}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+
+                  {/* ページネーション */}
+                  {totalListPages > 1 && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", paddingTop: "4px" }}>
+                      <button
+                        onClick={() => setListPage((p) => Math.max(0, p - 1))}
+                        disabled={listPage === 0}
+                        style={{
+                          fontFamily: FONT, fontWeight: 700, fontSize: "14px", cursor: listPage === 0 ? "default" : "pointer",
+                          width: "32px", height: "32px", borderRadius: "50%",
+                          border: "1.5px solid #E2D6BE", background: "#FBF6EC",
+                          color: listPage === 0 ? "#D4C9B4" : "#7A6A53",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        ‹
+                      </button>
+                      {Array.from({ length: totalListPages }, (_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setListPage(i)}
+                          style={{
+                            fontFamily: FONT, fontWeight: 700, fontSize: "12px", cursor: "pointer",
+                            width: "32px", height: "32px", borderRadius: "50%",
+                            border: listPage === i ? "1.5px solid #C77B4A" : "1.5px solid #E2D6BE",
+                            background: listPage === i ? "#C77B4A" : "#FBF6EC",
+                            color: listPage === i ? "#fff" : "#7A6A53",
+                          }}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => setListPage((p) => Math.min(totalListPages - 1, p + 1))}
+                        disabled={listPage === totalListPages - 1}
+                        style={{
+                          fontFamily: FONT, fontWeight: 700, fontSize: "14px", cursor: listPage === totalListPages - 1 ? "default" : "pointer",
+                          width: "32px", height: "32px", borderRadius: "50%",
+                          border: "1.5px solid #E2D6BE", background: "#FBF6EC",
+                          color: listPage === totalListPages - 1 ? "#D4C9B4" : "#7A6A53",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        ›
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
