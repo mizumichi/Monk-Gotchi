@@ -153,7 +153,7 @@ export default function JournalReviewPage() {
             href="/dashboard"
             style={{ display: "flex", alignItems: "center", gap: "4px", fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", color: "#5A7A33", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "999px", padding: "6px 12px", textDecoration: "none", whiteSpace: "nowrap" }}
           >
-            ← ダッシュボード
+            ← 戻る
           </Link>
         </header>
 

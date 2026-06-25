@@ -352,7 +352,7 @@ export default function DashboardPage() {
         {/* Hero tree section */}
         <div style={{ flexShrink: 0, padding: "12px 16px 0" }}>
           <section style={{ borderRadius: "24px", overflow: "hidden", boxShadow: "0 6px 20px rgba(90,70,35,.12)", border: "1px solid #E6DBC4" }}>
-            <div style={{ position: "relative", height: "236px", background: `linear-gradient(180deg, ${sky.top}, ${sky.bot})`, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div style={{ position: "relative", height: "190px", background: `linear-gradient(180deg, ${sky.top}, ${sky.bot})`, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
               {/* Sun/moon (double-tap to toggle test tools) */}
               <div
                 onClick={handleSunDoubleTap}
@@ -547,12 +547,12 @@ export default function DashboardPage() {
               style={{ width: "390px", maxWidth: "100%", background: "#F7F0E1", borderRadius: "0 0 26px 26px", padding: "16px 18px 24px", boxShadow: "0 16px 50px rgba(50,35,15,.3)", display: "flex", flexDirection: "column", gap: "15px", fontFamily: FONT }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 800, fontSize: "16px", color: "#6E4A2A" }}>サイクルのバランス</span>
+                <span style={{ fontWeight: 800, fontSize: "15px", letterSpacing: ".08em", color: "#6E4A2A" }}>📊 バランス</span>
                 <button
                   onClick={() => setShowBalance(false)}
-                  style={{ width: "30px", height: "30px", borderRadius: "50%", border: "none", background: "#EAE0CC", color: "#7A6A53", fontSize: "14px", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  style={{ display: "flex", alignItems: "center", gap: "4px", fontFamily: FONT, fontWeight: 700, fontSize: "11.5px", color: "#5A7A33", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "999px", padding: "6px 12px", cursor: "pointer", whiteSpace: "nowrap" }}
                 >
-                  ✕
+                  ← 戻る
                 </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "13px" }}>
