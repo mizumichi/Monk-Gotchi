@@ -17,6 +17,13 @@ import { buildAggregatesForDays, getTreeRank, type DailyLogLike } from "@/lib/ev
 import { TASKS, type Category, type Task } from "@/data/tasks";
 import type { Schema } from "../../../amplify/data/resource";
 
+function getStageFromPhase(phase: string): string {
+  if (phase === 'egg') return 'egg';
+  if (phase === 'baby') return 'early';
+  if (phase === 'mid') return 'mid';
+  return 'final';
+}
+
 type DailyLog = Schema["DailyLog"]["type"];
 type Scores = Record<Category, number>;
 type TabKey = "routine" | "strength" | "sleep" | "nutrition" | "environment" | "mental";
@@ -89,6 +96,14 @@ export default function DashboardPage() {
   const lastSunTapRef = useRef(0);
   const [routineOrder, setRoutineOrder] = useState<string[]>([]);
 
+  // PublicProfile mirror refs
+  const mirrorUserRef = useRef<{ nickname: string; isStatusPublic: boolean } | null>(null);
+  const mirrorFruitsRef = useRef<number>(0);
+  const mirrorUserIdRef = useRef<string | null>(null);
+  const mirrorProfileIdRef = useRef<string | null>(null);
+  const mirrorReadyRef = useRef(false);
+  const mirrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Load routine order from localStorage on mount
   useEffect(() => {
     try {
@@ -96,6 +111,30 @@ export default function DashboardPage() {
       if (stored) setRoutineOrder(JSON.parse(stored));
     } catch { /* ignore */ }
   }, []);
+
+  // Load mirror data (User settings + totalFruits) once on auth
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    async function loadMirrorData() {
+      try {
+        const { userId } = await getCurrentUser();
+        mirrorUserIdRef.current = userId;
+        const [{ data: users }, { data: harvests }] = await Promise.all([
+          client.models.User.list(),
+          client.models.Harvest.list(),
+        ]);
+        mirrorUserRef.current = {
+          nickname: users?.[0]?.nickname?.trim() || 'ぬる',
+          isStatusPublic: users?.[0]?.isStatusPublic ?? true,
+        };
+        mirrorFruitsRef.current = harvests?.reduce((sum, h) => sum + (h.fruitCount ?? 0), 0) ?? 0;
+        mirrorReadyRef.current = true;
+      } catch (err) {
+        console.error("[dashboard] loadMirrorData error:", err);
+      }
+    }
+    loadMirrorData();
+  }, [isAuthenticated]);
 
   // Routine tasks: starred tasks (including journal), apply custom order
   const filteredTasks = useMemo(() => {
@@ -124,6 +163,52 @@ export default function DashboardPage() {
     () => Object.values(cycleScores).reduce((sum, v) => sum + v, 0),
     [cycleScores],
   );
+
+  const todayXpForMirror = useMemo(
+    () => dailyLogs.reduce((sum, log) => sum + (log.points ?? 0), 0),
+    [dailyLogs],
+  );
+
+  // Debounced mirror write to PublicProfile on score/cycle change
+  useEffect(() => {
+    if (!isAuthenticated || !hasLoadedOnce) return;
+    if (mirrorTimerRef.current) clearTimeout(mirrorTimerRef.current);
+    mirrorTimerRef.current = setTimeout(async () => {
+      if (!mirrorReadyRef.current || !mirrorUserIdRef.current) return;
+      try {
+        const userId = mirrorUserIdRef.current;
+        const stage = getStageFromPhase(cycleInfo.phase);
+        const profileData = {
+          userId,
+          nickname: mirrorUserRef.current?.nickname ?? 'ぬる',
+          isStatusPublic: mirrorUserRef.current?.isStatusPublic ?? true,
+          todayXp: todayXpForMirror,
+          cycleDay: Math.min(cycleInfo.dayN, 7),
+          stage,
+          totalFruits: mirrorFruitsRef.current,
+        };
+        if (mirrorProfileIdRef.current) {
+          await client.models.PublicProfile.update({ id: mirrorProfileIdRef.current, ...profileData });
+        } else {
+          const { data: profiles } = await client.models.PublicProfile.list();
+          const mine = profiles?.find(p => p.userId === userId);
+          if (mine) {
+            mirrorProfileIdRef.current = mine.id;
+            await client.models.PublicProfile.update({ id: mine.id, ...profileData });
+          } else {
+            const { data: created } = await client.models.PublicProfile.create(profileData);
+            if (created) mirrorProfileIdRef.current = created.id;
+          }
+        }
+      } catch (err) {
+        console.error("[dashboard] mirror error:", err);
+      }
+    }, 1500);
+    return () => {
+      if (mirrorTimerRef.current) clearTimeout(mirrorTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, hasLoadedOnce, todayXpForMirror, cycleInfo.dayN]);
 
   // Sky gradient by time of day
   const sky = useMemo(() => {
@@ -217,6 +302,8 @@ export default function DashboardPage() {
     if (result.success) {
       showToast("収穫しました！");
       refetchRecentLogs();
+      // Update totalFruits ref after harvest
+      mirrorFruitsRef.current = mirrorFruitsRef.current + getTreeRank(harvestScoreRef.current).fruitCount;
     }
   }
 
@@ -514,14 +601,15 @@ export default function DashboardPage() {
                   <span style={{ fontSize: "28px" }}>🚪</span>
                   <span style={{ fontWeight: 700, fontSize: "11px", color: "#C75B4A" }}>ログアウト</span>
                 </button>
-                {/* フレンド（近日公開） */}
-                <div
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "14px 8px", background: "#F0EDE6", border: "1.5px solid #DDD6C6", borderRadius: "16px", opacity: 0.5 }}
+                {/* フレンド */}
+                <Link
+                  href="/friends"
+                  onClick={() => setShowMenu(false)}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "14px 8px", background: "#EBF1DC", border: "1.5px solid #CFE0AE", borderRadius: "16px", textDecoration: "none", cursor: "pointer" }}
                 >
                   <span style={{ fontSize: "28px" }}>👥</span>
-                  <span style={{ fontWeight: 700, fontSize: "11px", color: "#9A8B76" }}>フレンド</span>
-                  <span style={{ fontSize: "9px", color: "#B0A090", fontWeight: 600 }}>近日公開</span>
-                </div>
+                  <span style={{ fontWeight: 700, fontSize: "11px", color: "#5A7A33" }}>フレンド</span>
+                </Link>
                 {/* ジャーナル */}
                 <Link
                   href="/journal/review"
