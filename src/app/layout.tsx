@@ -14,12 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Monk-Gotchi",
+  title: "HI-T-TREE",
   description: "テストステロン向上習慣化アプリ",
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    title: 'Monk-Gotchi',
+    title: 'HI-T-TREE',
     statusBarStyle: 'black-translucent',
   },
   icons: {
