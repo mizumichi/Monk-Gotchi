@@ -1,10 +1,11 @@
 import type { Schema } from '../../data/resource';
-import { env } from '$amplify/env/generate-harvest-advice';
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/data';
 import { getAmplifyDataClientConfig } from '@aws-amplify/backend/function/runtime';
 
-const { resourceConfig, libraryOptions } = await getAmplifyDataClientConfig(env);
+// $amplify/env/ is a virtual module generated after first sandbox run.
+// Use process.env directly — same values, avoids the pre-generation chicken-and-egg issue.
+const { resourceConfig, libraryOptions } = await getAmplifyDataClientConfig(process.env);
 Amplify.configure(resourceConfig, libraryOptions);
 const client = generateClient<Schema>();
 
@@ -33,7 +34,8 @@ const RESPONSE_SCHEMA = {
 
 export const handler: Handler = async (event) => {
   const { harvestId, summary } = event.arguments;
-  const model = env.GEMINI_MODEL;
+  const model = process.env.GEMINI_MODEL ?? 'gemini-2.5-flash';
+  const apiKey = process.env.GEMINI_API_KEY ?? '';
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -41,7 +43,7 @@ export const handler: Handler = async (event) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': env.GEMINI_API_KEY,
+          'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
