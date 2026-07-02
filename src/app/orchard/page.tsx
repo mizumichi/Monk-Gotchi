@@ -3,9 +3,10 @@
 import { useAuthenticator } from "@aws-amplify/ui-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { client } from "@/lib/amplifyClient";
 import CrateDisplay from "@/components/CrateDisplay";
+import { HarvestAdviceCard } from "@/components/HarvestAdviceCard";
 import type { Schema } from "../../../amplify/data/resource";
 
 type HarvestEntry = Schema["Harvest"]["type"];
@@ -40,25 +41,40 @@ export default function OrchardPage() {
     if (authStatus === "unauthenticated") router.replace("/login");
   }, [authStatus, router]);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (authStatus !== "authenticated") return;
-    async function load() {
-      setLoading(true);
-      try {
-        const { data } = await client.models.Harvest.list();
-        setHarvests(
-          (data ?? []).sort((a, b) =>
-            (b.harvestedAt ?? "").localeCompare(a.harvestedAt ?? "")
-          )
-        );
-      } catch (err) {
-        console.error("Harvest fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
+    setLoading(true);
+    try {
+      const { data } = await client.models.Harvest.list();
+      setHarvests(
+        (data ?? []).sort((a, b) =>
+          (b.harvestedAt ?? "").localeCompare(a.harvestedAt ?? "")
+        )
+      );
+    } catch (err) {
+      console.error("Harvest fetch error:", err);
+    } finally {
+      setLoading(false);
     }
-    load();
   }, [authStatus]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Refetch on tab focus (picks up pending → done after Lambda finishes in background)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [load]);
+
+  // Poll every 5 s while any harvest is pending
+  useEffect(() => {
+    if (!harvests.some(h => h.aiStatus === 'pending')) return;
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
+  }, [harvests, load]);
 
   const totalFruits = harvests.reduce((sum, h) => sum + (h.fruitCount ?? 0), 0);
 
@@ -94,7 +110,7 @@ export default function OrchardPage() {
             </div>
           </div>
 
-          {/* Card grid */}
+          {/* Harvest list */}
           {loading ? (
             <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
               <p style={{ fontSize: "12px", fontWeight: 700, color: "#B6A485" }}>読み込み中...</p>
@@ -106,23 +122,33 @@ export default function OrchardPage() {
               <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#A8987F" }}>7日間頑張ったら最初の実がなります</p>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {harvests.map((h) => (
                 <div
                   key={h.id}
-                  style={{ background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "18px", padding: "12px 12px 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", boxShadow: "0 2px 8px rgba(90,70,35,.06)" }}
+                  style={{ background: "#FBF6EC", border: "1px solid #E6DBC4", borderRadius: "18px", padding: "12px 14px 14px", boxShadow: "0 2px 8px rgba(90,70,35,.06)" }}
                 >
-                  <CrateDisplay fruitCount={h.fruitCount ?? 0} />
-                  <p style={{ margin: 0, fontSize: "12px", fontWeight: 700, color: "#43382A" }}>
-                    {formatHarvestedAt(h.harvestedAt ?? "")}
-                  </p>
-                  <p style={{ margin: 0, fontSize: "11px", fontWeight: 800, color: RANK_COLOR[h.rank ?? "mid"] ?? "#A8987F" }}>
-                    {RANK_LABEL[h.rank ?? "mid"] ?? h.rank}
-                  </p>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <span style={{ fontSize: "10.5px", color: "#A8987F" }}>{h.totalScore ?? 0}pt</span>
-                    <span style={{ fontSize: "10.5px", color: "#5A9E2E", fontWeight: 700 }}>🍎 {h.fruitCount}個</span>
+                  {/* Card header: crate + harvest info side-by-side */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: "72px", flexShrink: 0 }}>
+                      <CrateDisplay fruitCount={h.fruitCount ?? 0} />
+                    </div>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "3px" }}>
+                      <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: "#43382A" }}>
+                        {formatHarvestedAt(h.harvestedAt ?? "")}
+                      </p>
+                      <p style={{ margin: 0, fontSize: "12px", fontWeight: 800, color: RANK_COLOR[h.rank ?? "mid"] ?? "#A8987F" }}>
+                        {RANK_LABEL[h.rank ?? "mid"] ?? h.rank}
+                      </p>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <span style={{ fontSize: "11px", color: "#A8987F" }}>{h.totalScore ?? 0}pt</span>
+                        <span style={{ fontSize: "11px", color: "#5A9E2E", fontWeight: 700 }}>🍎 {h.fruitCount}個</span>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* AI advice section */}
+                  <HarvestAdviceCard harvest={h} />
                 </div>
               ))}
             </div>

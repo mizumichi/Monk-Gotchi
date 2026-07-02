@@ -4,6 +4,9 @@ import { client } from './amplifyClient';
 import { getTaskById, calcCategoryScores, type Category } from '@/data/tasks';
 import { calcSleepHoursXp } from '@/lib/sleepXp';
 import { buildAggregatesForDays, type DailyLogLike } from '@/lib/evolution';
+import type { Schema } from '../../amplify/data/resource';
+
+type DailyLogRecord = Schema['DailyLog']['type'];
 
 // Matches §4 of PHASE_HARVEST_AI_SPEC.md — numbers only, no free-text fields.
 export type HarvestSummary = {
@@ -94,4 +97,43 @@ export function buildHarvestSummary(params: {
 // summary is passed as object — a.json() accepts object directly.
 export async function requestHarvestAdvice(harvestId: string, summary: HarvestSummary) {
   return client.mutations.generateHarvestAdvice({ harvestId, summary });
+}
+
+// Fetch DailyLog records for a completed cycle.
+// Used by HarvestAdviceCard re-generation (and G-3 backfill for old harvests).
+export async function loadCycleLogs(cycleStartDate: string, harvestedAt: string): Promise<DailyLogLike[]> {
+  const endDate = harvestedAt.split('T')[0];
+  const allData: DailyLogRecord[] = [];
+  let nextToken: string | null | undefined;
+  do {
+    const res = await client.models.DailyLog.list({
+      filter: { date: { between: [cycleStartDate, endDate] } },
+      ...(nextToken ? { nextToken } : {}),
+    });
+    allData.push(...(res.data ?? []));
+    nextToken = res.nextToken;
+  } while (nextToken);
+
+  const byDate = new Map<string, { completedTaskIds: string[]; numericValues: Record<string, number> }>();
+  for (const log of allData) {
+    const entry = byDate.get(log.date) ?? { completedTaskIds: [], numericValues: {} };
+    entry.completedTaskIds.push(log.taskId);
+    if (log.numericValues) {
+      try {
+        const nv = typeof log.numericValues === 'string' ? JSON.parse(log.numericValues) : log.numericValues;
+        if (nv && typeof nv === 'object' && !Array.isArray(nv)) {
+          for (const [k, v] of Object.entries(nv)) {
+            if (typeof v === 'number') entry.numericValues[k] = v;
+          }
+        }
+      } catch { /* skip malformed */ }
+    }
+    byDate.set(log.date, entry);
+  }
+
+  return Array.from(byDate.entries()).map(([date, { completedTaskIds, numericValues }]) => ({
+    date,
+    completedTaskIds,
+    numericValues,
+  }));
 }
