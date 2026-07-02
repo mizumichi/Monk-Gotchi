@@ -203,7 +203,6 @@ export default function JournalChart({ slots, rangeLabel, onRangeChange }: Props
                   );
                 }}
               />
-              {/* connectNulls={false} でnullをまたいで線を繋がない */}
               <Line
                 type="monotone"
                 dataKey="mood"
@@ -211,7 +210,7 @@ export default function JournalChart({ slots, rangeLabel, onRangeChange }: Props
                 strokeWidth={2.5}
                 dot={renderDot as Parameters<typeof Line>[0]["dot"]}
                 activeDot={false}
-                connectNulls={false}
+                connectNulls={true}
                 isAnimationActive={false}
               />
             </LineChart>
