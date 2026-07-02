@@ -6,7 +6,12 @@ export const auth = defineAuth({
       verificationEmailStyle: 'CODE',
       verificationEmailSubject: '【HI-T-TREE】認証コードのご案内',
       verificationEmailBody: (createCode) =>
-        `以下の認証コードを入力してください。\n\n認証コード: ${createCode()}\n\nこのコードは10分間有効です。\n心当たりのない場合は、このメールを無視してください。`,
+        `以下の認証コードを入力してください。
+
+認証コード: ${createCode()}
+
+このコードは10分間有効です。
+心当たりのない場合は、このメールを無視してください。`,
     },
   },
 });
