@@ -89,6 +89,7 @@ export default function DashboardPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [harvestAnimating, setHarvestAnimating] = useState(false);
+  const [aiAdviceLoading, setAiAdviceLoading] = useState(false);
   const harvestScoreRef = useRef(0);
   const [showBalance, setShowBalance] = useState(false);
   const [showHarvestConfirm, setShowHarvestConfirm] = useState(false);
@@ -303,27 +304,39 @@ export default function DashboardPage() {
     const preFullLogs = fullLogs;
     const result = await harvest(harvestScoreRef.current);
     setLogsTrigger((n) => n + 1);
-    if (result.success) {
-      showToast("収穫しました！");
-      refetchRecentLogs();
-      // Update totalFruits ref after harvest
-      mirrorFruitsRef.current = mirrorFruitsRef.current + getTreeRank(harvestScoreRef.current).fruitCount;
+
+    if (!result.success) {
+      showToast("収穫に失敗しました");
+      return;
     }
 
-    // Fire advice generation in parallel — do NOT await (must not block animation/reset)
-    if (result.harvestId) {
-      const { rank, fruitCount } = getTreeRank(harvestScoreRef.current);
-      const summary = buildHarvestSummary({
-        fullLogs: preFullLogs as DailyLogLike[],
-        cycleStartDate: preCycleStartDate,
-        harvestedAt: new Date().toISOString(),
-        rank,
-        fruitCount,
-        totalScore: harvestScoreRef.current,
-      });
-      requestHarvestAdvice(result.harvestId, summary).catch((e) => {
-        console.error('[harvest-ai] advice generation failed', e);
-      });
+    refetchRecentLogs();
+    mirrorFruitsRef.current = mirrorFruitsRef.current + getTreeRank(harvestScoreRef.current).fruitCount;
+
+    if (!result.harvestId) {
+      showToast("収穫しました！");
+      return;
+    }
+
+    // Await advice generation so failure is surfaced immediately at harvest time
+    const { rank, fruitCount } = getTreeRank(harvestScoreRef.current);
+    const summary = buildHarvestSummary({
+      fullLogs: preFullLogs as DailyLogLike[],
+      cycleStartDate: preCycleStartDate,
+      harvestedAt: new Date().toISOString(),
+      rank,
+      fruitCount,
+      totalScore: harvestScoreRef.current,
+    });
+    setAiAdviceLoading(true);
+    try {
+      await requestHarvestAdvice(result.harvestId, summary);
+      showToast("収穫しました！果樹園でアドバイスを確認できます");
+    } catch (e) {
+      console.error('[harvest-ai] advice generation failed', e);
+      showToast("収穫しました。アドバイスの生成に失敗しました");
+    } finally {
+      setAiAdviceLoading(false);
     }
   }
 
@@ -433,6 +446,14 @@ export default function DashboardPage() {
         {toastMessage && (
           <div style={{ position: "fixed", top: "64px", left: "50%", transform: "translateX(-50%)", zIndex: 50, background: "#5A7A33", color: "#fff", padding: "10px 20px", borderRadius: "999px", fontWeight: 700, fontSize: "13px", whiteSpace: "nowrap", boxShadow: "0 4px 12px rgba(80,60,30,.25)", fontFamily: FONT }}>
             {toastMessage}
+          </div>
+        )}
+
+        {/* AI advice loading banner (harvest-time, awaited) */}
+        {aiAdviceLoading && (
+          <div style={{ position: "fixed", top: "64px", left: "50%", transform: "translateX(-50%)", zIndex: 50, background: "#43382A", color: "#fff", padding: "10px 18px", borderRadius: "999px", fontWeight: 700, fontSize: "13px", whiteSpace: "nowrap", boxShadow: "0 4px 12px rgba(80,60,30,.25)", fontFamily: FONT, display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="animate-spin" style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", flexShrink: 0 }} />
+            アドバイスを生成中…
           </div>
         )}
 
