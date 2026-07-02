@@ -5,7 +5,9 @@ import { getAmplifyDataClientConfig } from '@aws-amplify/backend/function/runtim
 
 // $amplify/env/ is a virtual module generated after first sandbox run.
 // Use process.env directly — same values, avoids the pre-generation chicken-and-egg issue.
-const { resourceConfig, libraryOptions } = await getAmplifyDataClientConfig(process.env);
+// Cast needed: process.env is string|undefined but DataClientEnv requires string (AWS injects all required vars at runtime).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const { resourceConfig, libraryOptions } = await getAmplifyDataClientConfig(process.env as any);
 Amplify.configure(resourceConfig, libraryOptions);
 const client = generateClient<Schema>();
 
