@@ -1,6 +1,13 @@
 import { a, defineData, type ClientSchema } from '@aws-amplify/backend';
+import { generateHarvestAdviceFn } from '../functions/generate-harvest-advice/resource';
 
 const schema = a.schema({
+  HarvestAdvice: a.customType({
+    verdict:    a.string().required(),
+    goodPoints: a.string().array().required(),
+    advice:     a.string().array().required(),
+  }),
+
   User: a
     .model({
       displayName: a.string().required(),
@@ -52,8 +59,22 @@ const schema = a.schema({
       totalScore: a.integer().required(),
       rank: a.string().required(),
       fruitCount: a.integer().required(),
+      aiStatus:      a.string(),
+      aiAdvice:      a.json(),
+      aiGeneratedAt: a.datetime(),
+      aiModel:       a.string(),
     })
     .authorization((allow) => [allow.owner()]),
+
+  generateHarvestAdvice: a
+    .mutation()
+    .arguments({
+      harvestId: a.string().required(),
+      summary:   a.json().required(),
+    })
+    .returns(a.ref('HarvestAdvice'))
+    .authorization((allow) => [allow.authenticated()])
+    .handler(a.handler.function(generateHarvestAdviceFn)),
 
   UserSettings: a
     .model({
@@ -69,7 +90,10 @@ const schema = a.schema({
       text: a.string(),
     })
     .authorization((allow) => [allow.owner()]),
-});
+})
+.authorization((allow) => [
+  allow.resource(generateHarvestAdviceFn).to(['mutate']),
+]);
 
 export type Schema = ClientSchema<typeof schema>;
 

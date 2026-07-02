@@ -1,10 +1,12 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
+import { generateHarvestAdviceFn } from './functions/generate-harvest-advice/resource';
 
 const backend = defineBackend({
   auth,
   data,
+  generateHarvestAdviceFn,
 });
 
 // Cognito default requires uppercase/lowercase/digits/symbols.
