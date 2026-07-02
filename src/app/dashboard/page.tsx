@@ -540,6 +540,7 @@ export default function DashboardPage() {
             onJournalSave={handleJournalSave}
             onJournalDelete={handleJournalDelete}
             onReorder={activeTab === "routine" ? handleReorder : undefined}
+            disabled={cycleInfo.phase === "final" || cycleInfo.isOverflow}
           />
 
           {/* Test tools (hidden by default, double-tap sun to toggle) */}

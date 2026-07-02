@@ -66,6 +66,7 @@ interface Props {
   onJournalSave?: (slot: "morning" | "evening", mood: number, text: string) => Promise<void>;
   onJournalDelete?: (slot: "morning" | "evening") => Promise<void>;
   onReorder?: (newIds: string[]) => void;
+  disabled?: boolean;
 }
 
 // Module-level: must not be defined inside the main component
@@ -147,6 +148,7 @@ export default function TaskList({
   onJournalSave,
   onJournalDelete,
   onReorder,
+  disabled = false,
 }: Props) {
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [expandedReasonId, setExpandedReasonId] = useState<string | null>(null);
@@ -425,11 +427,18 @@ export default function TaskList({
 
   return (
     <>
-      {onReorder ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          {listContent}
-        </DndContext>
-      ) : listContent}
+      {disabled && (
+        <p style={{ textAlign: "center", fontSize: "13px", color: "#5A7A33", fontWeight: 700, margin: "0 0 8px", fontFamily: FONT }}>
+          🌳 収穫できます！まず収穫ボタンを押してください
+        </p>
+      )}
+      <div style={{ opacity: disabled ? 0.4 : 1, pointerEvents: disabled ? "none" : "auto" }}>
+        {onReorder ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            {listContent}
+          </DndContext>
+        ) : listContent}
+      </div>
 
       <TaskDetailModal task={detailTask} onClose={() => setDetailTask(null)} />
       <JournalModal
