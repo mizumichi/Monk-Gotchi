@@ -19,6 +19,7 @@ type AmplifyDailyLog = Schema["DailyLog"]["type"];
 
 export interface HarvestResult {
   success: boolean;
+  harvestId?: string;
 }
 
 export interface UseCharacterResult {
@@ -189,12 +190,13 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
       const harvestedAt = new Date().toISOString();
       const today = getRealCurrentDateString();
 
-      await client.models.Harvest.create({
+      const { data: created } = await client.models.Harvest.create({
         harvestedAt,
         cycleStartDate: character.cycleStartDate,
         totalScore,
         rank,
         fruitCount,
+        aiStatus: 'pending',
       });
 
       setDateOverride(null);
@@ -206,7 +208,7 @@ export function useCharacter(enabled: boolean = true): UseCharacterResult {
       });
       if (updated) setCharacter(updated);
 
-      return { success: true };
+      return { success: true, harvestId: created?.id };
     } catch (err) {
       console.error("[harvest] error:", err);
       return { success: false };

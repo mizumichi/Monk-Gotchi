@@ -14,6 +14,7 @@ import { useUserSettings } from "@/hooks/useUserSettings";
 import { client } from "@/lib/amplifyClient";
 import { getCurrentDateString } from "@/lib/date";
 import { buildAggregatesForDays, getTreeRank, type DailyLogLike } from "@/lib/evolution";
+import { buildHarvestSummary, requestHarvestAdvice } from "@/lib/harvestAdvice";
 import { TASKS, type Category, type Task } from "@/data/tasks";
 import type { Schema } from "../../../amplify/data/resource";
 
@@ -297,6 +298,9 @@ export default function DashboardPage() {
   async function handleHarvestAnimationComplete() {
     setHarvestAnimating(false);
     setDailyLogs([]);
+    // Capture before harvest() resets the character (cycleStartDate will change after re-render)
+    const preCycleStartDate = cycleStartDate;
+    const preFullLogs = fullLogs;
     const result = await harvest(harvestScoreRef.current);
     setLogsTrigger((n) => n + 1);
     if (result.success) {
@@ -304,6 +308,22 @@ export default function DashboardPage() {
       refetchRecentLogs();
       // Update totalFruits ref after harvest
       mirrorFruitsRef.current = mirrorFruitsRef.current + getTreeRank(harvestScoreRef.current).fruitCount;
+    }
+
+    // Fire advice generation in parallel — do NOT await (must not block animation/reset)
+    if (result.harvestId) {
+      const { rank, fruitCount } = getTreeRank(harvestScoreRef.current);
+      const summary = buildHarvestSummary({
+        fullLogs: preFullLogs as DailyLogLike[],
+        cycleStartDate: preCycleStartDate,
+        harvestedAt: new Date().toISOString(),
+        rank,
+        fruitCount,
+        totalScore: harvestScoreRef.current,
+      });
+      requestHarvestAdvice(result.harvestId, summary).catch((e) => {
+        console.error('[harvest-ai] advice generation failed', e);
+      });
     }
   }
 
